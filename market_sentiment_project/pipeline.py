@@ -1,9 +1,4 @@
 # =========================
-# INSTALL (run once)
-# =========================
-!pip install pandas matplotlib feedparser transformers torch pycoingecko newspaper3k lxml_html_clean
-
-# =========================
 # IMPORTS
 # =========================
 import pandas as pd
