@@ -34,7 +34,20 @@ sentiment_pipeline = pipeline(
     model="cardiffnlp/twitter-roberta-base-sentiment",
     device=-1
 )
+#==========================
+# TIME DECAY
+#==========================
+from datetime import datetime
 
+def time_decay(published_at):
+    if pd.isna(published_at):
+        return 0.5
+
+    now = datetime.utcnow()
+    hours_old = (now - published_at.to_pydatetime()).total_seconds() / 3600
+
+    # exponential decay
+    return max(0.1, 1 / (1 + hours_old / 6))
 # =========================
 # TEXT HELPERS
 # =========================
@@ -139,6 +152,16 @@ def analyze_news_batch(articles):
     df["importance"] = df.apply(compute_importance, axis=1)
     df["signal"] = df.apply(signal_strength, axis=1)
 
+    df["time_weight"] = df["published_at"].apply(time_decay)
+    df["weighted_signal"] = df["signal"] * df["time_weight"]
+
+    def compute_momentum(df):
+    if df.empty:
+        return 0
+
+    # recent signals weighted more
+    return df["weighted_signal"].sum()
+    
     return df
 
 # ---------------------------
@@ -223,7 +246,7 @@ def run_pipeline():
 
     df = analyze_news_batch(articles)
     print(df[["title", "sentiment", "confidence", "importance", "signal"]].head())
-    
+    market_signal = compute_momentum(df)
     btc_price = fetch_btc_price()
 
     print(f"\nBTC Price: ${btc_price}\n")
@@ -242,7 +265,7 @@ def run_pipeline():
 
     save_cache()
 
-    return df, btc_price
+    return df, btc_price, market_signal
 
 # =========================
 # RUN
