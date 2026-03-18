@@ -156,8 +156,8 @@ def analyze_news_batch(articles):
     df["weighted_signal"] = df["signal"] * df["time_weight"]
 
     def compute_momentum(df):
-    if df.empty:
-        return 0
+        if df.empty:
+            return 0
 
     # recent signals weighted more
     return df["weighted_signal"].sum()
