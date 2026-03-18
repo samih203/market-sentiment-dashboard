@@ -5,7 +5,9 @@ st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
 
 st.title("📊 Crypto Market Sentiment Dashboard")
 
-df, btc_price = run_pipeline()
+df, btc_price, market_signal = run_pipeline()
+
+st.metric("Market Sentiment Signal", round(market_signal, 3))
 
 st.subheader(f"BTC Price: ${btc_price}")
 
