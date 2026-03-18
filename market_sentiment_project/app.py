@@ -1,5 +1,5 @@
 import streamlit as st
-from pipeline import run_pipeline
+from market_sentiment_project.pipeline import run_pipeline
 
 st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
 
