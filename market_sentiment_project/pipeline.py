@@ -38,16 +38,23 @@ sentiment_pipeline = pipeline(
 # TIME DECAY
 #==========================
 from datetime import datetime
+import pandas as pd
 
 def time_decay(published_at):
     if pd.isna(published_at):
         return 0.5
 
-    now = datetime.utcnow()
-    hours_old = (now - published_at.to_pydatetime()).total_seconds() / 3600
+    try:
+        # convert to pandas datetime (handles timezone safely)
+        published_at = pd.to_datetime(published_at, utc=True)
+        now = pd.Timestamp.utcnow()
 
-    # exponential decay
-    return max(0.1, 1 / (1 + hours_old / 6))
+        hours_old = (now - published_at).total_seconds() / 3600
+
+        return max(0.1, 1 / (1 + hours_old / 6))
+
+    except:
+        return 0.5
 # =========================
 # TEXT HELPERS
 # =========================
@@ -154,13 +161,6 @@ def analyze_news_batch(articles):
 
     df["time_weight"] = df["published_at"].apply(time_decay)
     df["weighted_signal"] = df["signal"] * df["time_weight"]
-
-    def compute_momentum(df):
-        if df.empty:
-            return 0
-
-    # recent signals weighted more
-    return df["weighted_signal"].sum()
     
     return df
 
@@ -224,7 +224,11 @@ def signal_strength(row):
         * row["confidence"]
         * row["importance"]
     )
+def compute_momentum(df):
+    if df.empty:
+        return 0
 
+    return df["weighted_signal"].sum()
 # =========================
 # BTC PRICE
 # =========================
@@ -266,8 +270,3 @@ def run_pipeline():
     save_cache()
 
     return df, btc_price, market_signal
-
-# =========================
-# RUN
-# =========================
-df = run_pipeline()
