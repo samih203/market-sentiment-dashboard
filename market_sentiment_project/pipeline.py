@@ -96,14 +96,16 @@ def analyze_news_batch(articles):
 
     for a in articles:
         text = a.get("title", "")
-        short_text = shorten_text(text)
 
-        if not short_text:
+        if not text:
             continue
+
+        short_text = shorten_text(text)
 
         texts.append(short_text)
         metadata.append(a)
 
+    # Run sentiment in batch
     results = batch_sentiment(texts)
 
     label_map = {
@@ -113,22 +115,31 @@ def analyze_news_batch(articles):
     }
 
     rows = []
+
     for r, a in zip(results, metadata):
         sentiment = label_map.get(r["label"], "neutral")
         confidence = float(r["score"])
-        
-if confidence < 0.55:
-    sentiment = "neutral"
-    
+
         rows.append({
-            "title": a["title"],
+            "title": a.get("title"),
             "sentiment": sentiment,
             "confidence": confidence,
-            "published_at": a["published_at"],
-            "source": a["source"]
+            "published_at": a.get("published_at"),
+            "source": a.get("source")
         })
 
-    return pd.DataFrame(rows)
+    # Create DataFrame
+    df = pd.DataFrame(rows)
+
+    # Safety check
+    if df.empty:
+        return df
+
+    # Compute importance + signal
+    df["importance"] = df.apply(compute_importance, axis=1)
+    df["signal"] = df.apply(signal_strength, axis=1)
+
+    return df
 
 # ---------------------------
 # Importance & Signal
@@ -211,10 +222,8 @@ def run_pipeline():
     articles += fetch_rss_news(REUTERS_RSS, "Reuters")
 
     df = analyze_news_batch(articles)
-
-    df["importance"] = df.apply(compute_importance, axis=1)
-    df["signal"] = df.apply(signal_strength, axis=1)
-
+    print(df[["title", "sentiment", "confidence", "importance", "signal"]].head())
+    
     btc_price = fetch_btc_price()
 
     print(f"\nBTC Price: ${btc_price}\n")
