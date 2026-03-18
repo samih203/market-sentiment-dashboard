@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import feedparser
 from transformers import pipeline
 from pycoingecko import CoinGeckoAPI
-from newspaper import Article
 import torch
 
 torch.set_grad_enabled(False)
@@ -42,46 +41,13 @@ sentiment_pipeline = pipeline(
 def shorten_text(text, max_words=200):
     return " ".join(text.split()[:max_words])
 
-def extract_key_text(url):
-    # Check cache first
-    if url in ARTICLE_CACHE:
-        return ARTICLE_CACHE[url]
-
-    try:
-        article = Article(url)
-        article.download()
-        article.parse()
-
-        text = article.text
-        paragraphs = text.split("\n")
-
-        paragraphs = [p.strip() for p in paragraphs if len(p.strip()) > 50]
-
-        if len(paragraphs) < 3:
-            final_text = text
-        else:
-            selected = paragraphs[:2] + [paragraphs[-1]]
-            final_text = " ".join(selected)
-
-        # Save to cache
-        ARTICLE_CACHE[url] = final_text
-
-        # ✅ LIMIT CACHE SIZE HERE
-        if len(ARTICLE_CACHE) > 500:
-            ARTICLE_CACHE.clear()
-
-        return final_text
-
-    except:
-        return ""
-
 def get_article_content(article):
     url = article.get("url")
 
     if not url:
         return article.get("title", "")
 
-    text = extract_key_text(url)
+    text = article.get("title")
 
     if not text or len(text.split()) < 50:
         return article.get("title", "")
