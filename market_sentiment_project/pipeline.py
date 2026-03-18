@@ -234,9 +234,34 @@ def compute_momentum(df):
 # =========================
 cg = CoinGeckoAPI()
 
+import time
+
+BTC_CACHE = {
+    "price": None,
+    "timestamp": 0
+}
+
 def fetch_btc_price():
-    price_data = cg.get_price(ids='bitcoin', vs_currencies='usd')
-    return price_data['bitcoin']['usd']
+    now = time.time()
+
+    # cache for 60 seconds
+    if BTC_CACHE["price"] is not None and now - BTC_CACHE["timestamp"] < 60:
+        return BTC_CACHE["price"]
+
+    try:
+        price_data = cg.get_price(ids='bitcoin', vs_currencies='usd')
+        price = price_data['bitcoin']['usd']
+
+        BTC_CACHE["price"] = price
+        BTC_CACHE["timestamp"] = now
+
+        return price
+
+    except Exception as e:
+        print("BTC fetch error:", e)
+
+        # fallback to last known price
+        return BTC_CACHE["price"] if BTC_CACHE["price"] else 0
 
 # =========================
 # MAIN PIPELINE
