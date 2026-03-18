@@ -95,11 +95,8 @@ def analyze_news_batch(articles):
     articles = articles[:25]  # limit for speed
 
     for a in articles:
-        body = get_article_content(a)
-        headline = a.get("title", "")
-
-        full_text = headline + ". " + body
-        short_text = shorten_text(full_text)
+        text = a.get("title", "")
+        short_text = shorten_text(text)
 
         if not short_text:
             continue
@@ -119,7 +116,10 @@ def analyze_news_batch(articles):
     for r, a in zip(results, metadata):
         sentiment = label_map.get(r["label"], "neutral")
         confidence = float(r["score"])
-
+        
+if confidence < 0.55:
+    sentiment = "neutral"
+    
         rows.append({
             "title": a["title"],
             "sentiment": sentiment,
@@ -130,24 +130,66 @@ def analyze_news_batch(articles):
 
     return pd.DataFrame(rows)
 
-# =========================
-# SIGNAL LOGIC
-# =========================
+# ---------------------------
+# Importance & Signal
+# ---------------------------
+
+IMPORTANT_KEYWORDS = {
+    "bitcoin": 0.3,
+    "btc": 0.3,
+    "ethereum": 0.3,
+    "crypto": 0.2,
+    "market": 0.2,
+    "etf": 0.4,
+    "sec": 0.4,
+    "regulation": 0.3,
+    "fed": 0.4,
+    "inflation": 0.3,
+    "interest": 0.3,
+    "rates": 0.3,
+    "crash": 0.5,
+    "drop": 0.4,
+    "surge": 0.5,
+    "rally": 0.5,
+    "bull": 0.4,
+    "bear": 0.4,
+    "ban": 0.4,
+    "approval": 0.3
+}
+
 SOURCE_WEIGHTS = {
     "Reuters": 0.4,
     "Bloomberg": 0.4,
     "CoinDesk": 0.2,
-    "Cointelegraph": 0.2
+    "Reddit/CryptoCurrency": 0.15
 }
 
 def compute_importance(row):
-    base = SOURCE_WEIGHTS.get(row["source"], 0.1)
-    confidence_bonus = row["confidence"] * 0.3
-    return min(base + confidence_bonus, 1.0)
+    text = str(row["title"]).lower()
+
+    score = 0.2  # ✅ base so nothing is zero
+
+    for keyword, weight in IMPORTANT_KEYWORDS.items():
+        if keyword in text:
+            score += weight
+
+    score += SOURCE_WEIGHTS.get(row["source"], 0.1)
+
+    return min(score, 1.0)
+
 
 def signal_strength(row):
-    sentiment_map = {"positive": 1, "neutral": 0, "negative": -1}
-    return sentiment_map[row["sentiment"]] * row["confidence"] * row["importance"]
+    sentiment_map = {
+        "positive": 1,
+        "neutral": 0,
+        "negative": -1
+    }
+
+    return (
+        sentiment_map.get(row["sentiment"], 0)
+        * row["confidence"]
+        * row["importance"]
+    )
 
 # =========================
 # BTC PRICE
