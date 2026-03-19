@@ -159,6 +159,15 @@ def analyze_news_batch(articles):
     df["importance"] = df.apply(compute_importance, axis=1)
     df["signal"] = df.apply(signal_strength, axis=1)
 
+    print("IMPORTANCE CHECK:")
+    print(df["importance"].describe())
+
+    print("\nSENTIMENT COUNTS:")
+    print(df["sentiment"].value_counts())
+
+    print("\nSIGNAL SAMPLE:")
+    print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
+
     df["time_weight"] = df["published_at"].apply(time_decay)
     df["weighted_signal"] = df["signal"] * df["time_weight"]
     
@@ -201,7 +210,7 @@ SOURCE_WEIGHTS = {
 def compute_importance(row):
     text = str(row["title"]).lower()
 
-    score = 0.2  # ✅ base so nothing is zero
+    score = 0.4  
 
     for keyword, weight in IMPORTANT_KEYWORDS.items():
         if keyword in text:
@@ -215,7 +224,7 @@ def compute_importance(row):
 def signal_strength(row):
     sentiment_map = {
         "positive": 1,
-        "neutral": 0,
+        "neutral": 0.2,
         "negative": -1
     }
 
@@ -223,7 +232,7 @@ def signal_strength(row):
     sentiment_map.get(row["sentiment"], 0)
     * (row["confidence"] ** 2)
     * row["importance"]
-    * 2
+    * 3
     )
 def compute_momentum(df):
     if df.empty:
@@ -264,6 +273,21 @@ def fetch_btc_price():
         # fallback to last known price
         return BTC_CACHE["price"] if BTC_CACHE["price"] else 0
 
+
+def compute_momentum(df):
+    if df.empty:
+        return 0
+
+    # fallback if columns missing
+    if "weighted_signal" not in df or "time_weight" not in df:
+        return df["signal"].mean()
+
+    total_weight = df["time_weight"].sum()
+
+    if total_weight == 0:
+        return df["signal"].mean()
+
+    return df["weighted_signal"].sum() / total_weight
 # =========================
 # MAIN PIPELINE
 # =========================
@@ -293,6 +317,9 @@ def run_pipeline():
     plt.gca().invert_yaxis()
     plt.show()
 
+
+    print("DEBUG SIGNALS:")
+    print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
     save_cache()
 
     return df, btc_price, market_signal
