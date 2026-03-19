@@ -1,25 +1,43 @@
 import streamlit as st
-from pipeline import run_pipeline
-
 import pandas as pd
 import time
-if "history" not in st.session_state:
-    st.session_state.history = pd.DataFrame(columns=["time", "btc_price", "signal"])
+from pipeline import run_pipeline
 
+# ---------------------------
+# PAGE SETUP
+# ---------------------------
 st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
 
 st.title("📊 Crypto Market Sentiment Dashboard")
-import time
 
-time.sleep(5)
-st.rerun()
-
-# ✅ CACHE YOUR PIPELINE
+# ---------------------------
+# CACHE PIPELINE (prevents API spam)
+# ---------------------------
 @st.cache_data(ttl=10)
 def load_data():
     return run_pipeline()
 
-df, btc_price, market_signal = load_data()
+# ---------------------------
+# SAFE DATA LOAD
+# ---------------------------
+try:
+    df, btc_price, market_signal = load_data()
+except Exception as e:
+    st.error(f"Pipeline error: {e}")
+    st.stop()
+
+# ---------------------------
+# METRICS
+# ---------------------------
+st.metric("Market Sentiment Signal", round(market_signal, 3))
+st.subheader(f"BTC Price: ${btc_price}")
+
+# ---------------------------
+# STORE HISTORY (for chart)
+# ---------------------------
+if "history" not in st.session_state:
+    st.session_state.history = pd.DataFrame(columns=["time", "btc_price", "signal"])
+
 new_row = pd.DataFrame([{
     "time": pd.Timestamp.now(),
     "btc_price": btc_price,
@@ -30,31 +48,50 @@ st.session_state.history = pd.concat(
     [st.session_state.history, new_row],
     ignore_index=True
 )
+
+# limit size (prevents lag)
 st.session_state.history = st.session_state.history.tail(50)
 
-# ✅ Metrics
-st.metric("Market Sentiment Signal", round(market_signal, 3))
-st.subheader(f"BTC Price: ${btc_price}")
+# ---------------------------
+# TOP SIGNALS TABLE
+# ---------------------------
+if not df.empty:
+    df["abs_signal"] = df["signal"].abs()
+    top = df.sort_values("abs_signal", ascending=False).head(10)
 
-# ✅ Process data
-df["abs_signal"] = df["signal"].abs()
-top = df.sort_values("abs_signal", ascending=False).head(10)
+    st.subheader("Top Market Signals")
+    st.dataframe(top[["source","title","sentiment","confidence","signal"]])
 
-# ✅ Table
-st.dataframe(top[["source","title","sentiment","confidence","signal"]])
+    st.bar_chart(top.set_index("title")["signal"])
+else:
+    st.warning("No data available from pipeline.")
 
-# ✅ Chart
+# ---------------------------
+# BTC vs SENTIMENT CHART
+# ---------------------------
 st.subheader("📈 BTC Price vs Sentiment")
 
 history = st.session_state.history.copy()
 
-# Smooth BTC (optional but better visually)
-history["btc_smooth"] = history["btc_price"].rolling(3).mean()
+if len(history) > 2:
+    # Smooth BTC for better visuals
+    history["btc_smooth"] = history["btc_price"].rolling(3).mean()
 
-chart_data = history.set_index("time")[["btc_smooth", "signal"]]
+    chart_data = history.set_index("time")[["btc_smooth", "signal"]]
 
-st.line_chart(chart_data)
+    st.line_chart(chart_data)
+else:
+    st.write("Collecting data... refresh in a few seconds.")
 
-# ✅ Optional manual refresh
+# ---------------------------
+# MANUAL REFRESH BUTTON
+# ---------------------------
 if st.button("Refresh Data"):
     st.cache_data.clear()
+    st.rerun()
+
+# ---------------------------
+# AUTO REFRESH (every 5 sec)
+# ---------------------------
+time.sleep(5)
+st.rerun()
