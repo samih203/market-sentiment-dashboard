@@ -67,54 +67,48 @@ else:
 st.subheader("📈 BTC Price vs Sentiment (Normalized)")
 
 history = st.session_state.history.copy()
-history["signal_norm"] = (history["signal"] + 1) / 2
-# momentum
-history["signal_momentum"] = history["signal_norm"].diff()
-momentum = history["signal_momentum"].iloc[-1]
-
-history["signal_volatility"] = history["signal_norm"].rolling(5).std()
-
-volatility = history["signal_volatility"].iloc[-1]
-
-confidence = abs(market_signal) * (1 + abs(momentum))
 
 if len(history) > 2:
-    history = history.copy()
-
-    # Normalize BTC (0 → 1 scale)
+    # Normalize
     history["btc_norm"] = (
         history["btc_price"] - history["btc_price"].min()
     ) / (
         history["btc_price"].max() - history["btc_price"].min() + 1e-9
     )
 
-    # Normalize Signal (-1 → 1 → shift to 0 → 1)
-    history["signal_norm"] = (history["signal"] + 1) / 2
-
     chart_data = history.set_index("time")[["btc_norm", "signal_norm"]]
-
     st.line_chart(chart_data)
 
 else:
     st.write("Collecting data...")
 
+history["btc_norm"] = (
+    history["btc_price"] - history["btc_price"].min()
+) / (
+    history["btc_price"].max() - history["btc_price"].min() + 1e-9
+)
 
-    corr = history["btc_norm"].corr(history["signal_norm"])
+history["signal_norm"] = (history["signal"] + 1) / 2
+history["signal_momentum"] = history["signal_norm"].diff()
+history["signal_volatility"] = history["signal_norm"].rolling(5).std()
 
-    st.metric("BTC vs Sentiment Correlation", round(corr, 3))
+momentum = history["signal_momentum"].iloc[-1]
+volatility = history["signal_volatility"].iloc[-1]
+confidence = abs(market_signal) * (1 + abs(momentum))
 
-    history["signal_shifted"] = history["signal_norm"].shift(1)
-    
-    lead_corr = history["signal_shifted"].corr(history["btc_norm"])
+# Correlation
+corr = history["btc_norm"].corr(history["signal_norm"])
 
-    st.metric("Sentiment Leading Indicator", round(lead_corr, 3))
+st.metric("BTC vs Sentiment Correlation", round(corr, 3))
 
+# Lead indicator
+history["signal_shifted"] = history["signal_norm"].shift(1)
+lead_corr = history["signal_shifted"].corr(history["btc_norm"])
 
-    history["signal_momentum"] = history["signal_norm"].diff()
+st.metric("Sentiment Leading Indicator", round(lead_corr, 3))
 
-    momentum = history["signal_momentum"].iloc[-1]
-
-    st.metric("Sentiment Momentum", round(momentum, 3))
+# Momentum display
+st.metric("Sentiment Momentum", round(momentum, 3))
 
 # ---------------------------
 # METRICS
