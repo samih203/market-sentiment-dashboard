@@ -29,8 +29,14 @@ except Exception as e:
 # ---------------------------
 # METRICS
 # ---------------------------
-st.metric("Market Sentiment Signal", round(market_signal, 3))
-st.subheader(f"BTC Price: ${btc_price}")
+if market_signal > 0.1:
+    signal_label = "🟢 BUY"
+elif market_signal < -0.1:
+    signal_label = "🔴 SELL"
+else:
+    signal_label = "🟡 HOLD"
+st.progress(min(abs(market_signal), 1.0))
+st.metric("Market Sentiment", signal_label, delta=round(market_signal, 3))st.subheader(f"BTC Price: ${btc_price}")
 
 # ---------------------------
 # STORE HISTORY (for chart)
@@ -69,19 +75,34 @@ else:
 # ---------------------------
 # BTC vs SENTIMENT CHART
 # ---------------------------
+# ---------------------------
+# BTC vs SENTIMENT CHART
+# ---------------------------
 st.subheader("📈 BTC Price vs Sentiment")
 
 history = st.session_state.history.copy()
 
 if len(history) > 2:
-    # Smooth BTC for better visuals
     history["btc_smooth"] = history["btc_price"].rolling(3).mean()
+
+    # Divergence detection
+    history["signal_change"] = history["signal"].diff()
+    history["price_change"] = history["btc_price"].diff()
+
+    divergence = (
+        (history["signal_change"] > 0) & (history["price_change"] < 0)
+    ) | (
+        (history["signal_change"] < 0) & (history["price_change"] > 0)
+    )
+
+    if divergence.iloc[-1]:
+        st.warning("⚠️ Sentiment diverging from price")
 
     chart_data = history.set_index("time")[["btc_smooth", "signal"]]
 
     st.line_chart(chart_data)
 else:
-    st.write("Collecting data... refresh in a few seconds.")
+    st.write("Collecting data...")
 
 # ---------------------------
 # MANUAL REFRESH BUTTON
@@ -93,5 +114,6 @@ if st.button("Refresh Data"):
 # ---------------------------
 # AUTO REFRESH (every 5 sec)
 # ---------------------------
+import time
 time.sleep(5)
 st.rerun()
