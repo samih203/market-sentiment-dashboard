@@ -75,6 +75,12 @@ history["btc_norm"] = (
 )
 
 history["signal_norm"] = (history["signal"] + 1) / 2
+
+# Rolling correlation (window = 5 points)
+history["rolling_corr"] = history["btc_norm"].rolling(5).corr(history["signal_norm"])
+history["rolling_corr_scaled"] = (history["rolling_corr"] + 1) / 2
+
+
 history["signal_momentum"] = history["signal_norm"].diff()
 history["signal_volatility"] = history["signal_norm"].rolling(5).std()
 
@@ -86,8 +92,8 @@ if len(history) > 2:
         history["btc_price"].max() - history["btc_price"].min() + 1e-9
     )
 
-    chart_data = history.set_index("time")[["btc_norm", "signal_norm"]]
-    st.line_chart(chart_data)
+chart_data = history.set_index("time")[["btc_norm", "signal_norm", "rolling_corr_scaled"]]    
+st.line_chart(chart_data)
 
 else:
     st.write("Collecting data...")
@@ -111,6 +117,15 @@ st.metric("Sentiment Leading Indicator", round(lead_corr, 3))
 # Momentum display
 st.metric("Sentiment Momentum", round(momentum, 3))
 
+
+latest_corr = history["rolling_corr"].iloc[-1]
+
+if latest_corr > 0.5:
+    st.success("📈 Strong positive correlation (trend confirmation)")
+elif latest_corr < -0.5:
+    st.warning("⚠️ Strong negative correlation (possible reversal)")
+else:
+    st.info("➖ Weak correlation (no clear signal)")
 # ---------------------------
 # METRICS
 # ---------------------------
