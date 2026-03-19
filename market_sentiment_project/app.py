@@ -44,16 +44,14 @@ top = df.sort_values("abs_signal", ascending=False).head(10)
 st.dataframe(top[["source","title","sentiment","confidence","signal"]])
 
 # ✅ Chart
-st.bar_chart(top.set_index("title")["signal"])
-st.subheader("📈 BTC vs Sentiment (Normalized)")
+st.subheader("📈 BTC Price vs Sentiment")
 
 history = st.session_state.history.copy()
 
-# Normalize
-history["btc_norm"] = history["btc_price"] / history["btc_price"].iloc[0]
-history["signal_norm"] = history["signal"] / max(abs(history["signal"].max()), 1)
+# Smooth BTC (optional but better visually)
+history["btc_smooth"] = history["btc_price"].rolling(3).mean()
 
-chart_data = history.set_index("time")[["btc_norm", "signal_norm"]]
+chart_data = history.set_index("time")[["btc_smooth", "signal"]]
 
 st.line_chart(chart_data)
 
