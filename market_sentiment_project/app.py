@@ -79,29 +79,27 @@ else:
 # ---------------------------
 # BTC vs SENTIMENT CHART
 # ---------------------------
-st.subheader("📈 BTC Price vs Sentiment")
+st.subheader("📈 BTC Price vs Sentiment (Normalized)")
 
 history = st.session_state.history.copy()
 
 if len(history) > 2:
-    history["btc_smooth"] = history["btc_price"].rolling(3).mean()
+    history = history.copy()
 
-    # Divergence detection
-    history["signal_change"] = history["signal"].diff()
-    history["price_change"] = history["btc_price"].diff()
-
-    divergence = (
-        (history["signal_change"] > 0) & (history["price_change"] < 0)
-    ) | (
-        (history["signal_change"] < 0) & (history["price_change"] > 0)
+    # Normalize BTC (0 → 1 scale)
+    history["btc_norm"] = (
+        history["btc_price"] - history["btc_price"].min()
+    ) / (
+        history["btc_price"].max() - history["btc_price"].min() + 1e-9
     )
 
-    if divergence.iloc[-1]:
-        st.warning("⚠️ Sentiment diverging from price")
+    # Normalize Signal (-1 → 1 → shift to 0 → 1)
+    history["signal_norm"] = (history["signal"] + 1) / 2
 
-    chart_data = history.set_index("time")[["btc_smooth", "signal"]]
+    chart_data = history.set_index("time")[["btc_norm", "signal_norm"]]
 
     st.line_chart(chart_data)
+
 else:
     st.write("Collecting data...")
 
