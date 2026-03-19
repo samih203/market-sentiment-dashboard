@@ -61,6 +61,17 @@ if not df.empty:
 else:
     st.warning("No data available from pipeline.")
 
+
+history["btc_norm"] = (
+    history["btc_price"] - history["btc_price"].min()
+) / (
+    history["btc_price"].max() - history["btc_price"].min() + 1e-9
+)
+
+history["signal_norm"] = (history["signal"] + 1) / 2
+history["signal_momentum"] = history["signal_norm"].diff()
+history["signal_volatility"] = history["signal_norm"].rolling(5).std()
+
 # ---------------------------
 # BTC vs SENTIMENT CHART
 # ---------------------------
@@ -82,15 +93,6 @@ if len(history) > 2:
 else:
     st.write("Collecting data...")
 
-history["btc_norm"] = (
-    history["btc_price"] - history["btc_price"].min()
-) / (
-    history["btc_price"].max() - history["btc_price"].min() + 1e-9
-)
-
-history["signal_norm"] = (history["signal"] + 1) / 2
-history["signal_momentum"] = history["signal_norm"].diff()
-history["signal_volatility"] = history["signal_norm"].rolling(5).std()
 
 momentum = history["signal_momentum"].iloc[-1]
 volatility = history["signal_volatility"].iloc[-1]
