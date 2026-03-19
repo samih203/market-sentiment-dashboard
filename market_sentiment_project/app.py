@@ -72,6 +72,11 @@ history["signal_norm"] = (history["signal"] + 1) / 2
 history["signal_momentum"] = history["signal_norm"].diff()
 momentum = history["signal_momentum"].iloc[-1]
 
+history["signal_volatility"] = history["signal_norm"].rolling(5).std()
+
+volatility = history["signal_volatility"].iloc[-1]
+
+confidence = abs(market_signal) * (1 + abs(momentum))
 
 if len(history) > 2:
     history = history.copy()
@@ -114,18 +119,31 @@ else:
 # ---------------------------
 # METRICS
 # ---------------------------
-if market_signal > 0.1 and momentum > 0:
+if volatility < 0.02:
+    signal_label = "⚪ NO CLEAR TREND"
+
+elif market_signal > 0.15 and momentum > 0 and confidence > 0.2:
     signal_label = "🟢 STRONG BUY"
+
 elif market_signal > 0:
     signal_label = "🟢 BUY"
-elif market_signal < -0.1 and momentum < 0:
+
+elif market_signal < -0.15 and momentum < 0 and confidence > 0.2:
     signal_label = "🔴 STRONG SELL"
+
 elif market_signal < 0:
     signal_label = "🔴 SELL"
+
 else:
     signal_label = "🟡 HOLD"
 
 st.metric("Market Signal", signal_label, delta=round(market_signal, 3))
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Momentum", round(momentum, 3))
+col2.metric("Volatility", round(volatility, 3))
+col3.metric("Confidence", round(confidence, 3))
 # ---------------------------
 # MANUAL REFRESH BUTTON
 # ---------------------------
