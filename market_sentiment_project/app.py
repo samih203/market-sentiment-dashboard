@@ -26,21 +26,6 @@ except Exception as e:
     st.error(f"Pipeline error: {e}")
     st.stop()
 
-# ---------------------------
-# METRICS
-# ---------------------------
-if market_signal > 0.1 and momentum > 0:
-    signal_label = "🟢 STRONG BUY"
-elif market_signal > 0:
-    signal_label = "🟢 BUY"
-elif market_signal < -0.1 and momentum < 0:
-    signal_label = "🔴 STRONG SELL"
-elif market_signal < 0:
-    signal_label = "🔴 SELL"
-else:
-    signal_label = "🟡 HOLD"
-
-st.metric("Market Signal", signal_label, delta=round(market_signal, 3))
 
 # ---------------------------
 # STORE HISTORY (for chart)
@@ -82,6 +67,11 @@ else:
 st.subheader("📈 BTC Price vs Sentiment (Normalized)")
 
 history = st.session_state.history.copy()
+history["signal_norm"] = (history["signal"] + 1) / 2
+# momentum
+history["signal_momentum"] = history["signal_norm"].diff()
+momentum = history["signal_momentum"].iloc[-1]
+
 
 if len(history) > 2:
     history = history.copy()
@@ -120,6 +110,22 @@ else:
     momentum = history["signal_momentum"].iloc[-1]
 
     st.metric("Sentiment Momentum", round(momentum, 3))
+
+# ---------------------------
+# METRICS
+# ---------------------------
+if market_signal > 0.1 and momentum > 0:
+    signal_label = "🟢 STRONG BUY"
+elif market_signal > 0:
+    signal_label = "🟢 BUY"
+elif market_signal < -0.1 and momentum < 0:
+    signal_label = "🔴 STRONG SELL"
+elif market_signal < 0:
+    signal_label = "🔴 SELL"
+else:
+    signal_label = "🟡 HOLD"
+
+st.metric("Market Signal", signal_label, delta=round(market_signal, 3))
 # ---------------------------
 # MANUAL REFRESH BUTTON
 # ---------------------------
