@@ -31,7 +31,7 @@ def save_cache():
 # =========================
 sentiment_pipeline = pipeline(
     "sentiment-analysis",
-    model="cardiffnlp/twitter-roberta-base-sentiment",
+    model="ProsusAI/finbert",
     device=-1
 )
 #==========================
