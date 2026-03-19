@@ -112,7 +112,7 @@ def analyze_news_batch(articles):
     texts = []
     metadata = []
 
-    articles = articles[:25]  
+    articles = articles[:50]  
 
     for a in articles:
         text = a.get("title", "")
@@ -129,9 +129,9 @@ def analyze_news_batch(articles):
     results = batch_sentiment(texts)
 
     label_map = {
-        "POSITIVE": "positive",
-        "NEGATIVE": "negative",
-        "NEUTRAL": "neutral"
+    "POSITIVE": 1,
+    "NEGATIVE": -1,
+    "NEUTRAL": 0
     }
 
     rows = []
@@ -141,12 +141,12 @@ def analyze_news_batch(articles):
         confidence = float(r["score"])
 
         rows.append({
-            "title": a.get("title"),
-            "sentiment": sentiment,
-            "confidence": confidence,
-            "published_at": a.get("published_at"),
-            "source": a.get("source")
-        })
+    "title": a["title"],
+    "sentiment": label_map.get(r["label"], 0),
+    "confidence": float(r["score"]),
+    "published_at": a["published_at"],
+    "source": a["source"]
+    })
 
     # Create DataFrame
     df = pd.DataFrame(rows)
@@ -178,26 +178,14 @@ def analyze_news_batch(articles):
 # ---------------------------
 
 IMPORTANT_KEYWORDS = {
-    "bitcoin": 0.3,
-    "btc": 0.3,
-    "ethereum": 0.3,
-    "crypto": 0.2,
-    "market": 0.2,
-    "etf": 0.4,
-    "sec": 0.4,
-    "regulation": 0.3,
-    "fed": 0.4,
-    "inflation": 0.3,
-    "interest": 0.3,
-    "rates": 0.3,
-    "crash": 0.5,
-    "drop": 0.4,
-    "surge": 0.5,
-    "rally": 0.5,
-    "bull": 0.4,
-    "bear": 0.4,
-    "ban": 0.4,
-    "approval": 0.3
+    "bitcoin": 0.6,
+    "ethereum": 0.6,
+    "etf": 0.8,
+    "sec": 0.8,
+    "crash": 1.0,
+    "surge": 1.0,
+    "inflation": 0.7,
+    "fed": 0.8
 }
 
 SOURCE_WEIGHTS = {
@@ -222,18 +210,14 @@ def compute_importance(row):
 
 
 def signal_strength(row):
-    sentiment_map = {
-        "positive": 1,
-        "neutral": 0.2,
-        "negative": -1
-    }
+    raw = row["sentiment"] * row["confidence"] * row["importance"]
 
-    return (
-    sentiment_map.get(row["sentiment"], 0)
-    * (row["confidence"] ** 2)
-    * row["importance"]
-    * 3
-    )
+    # prevent zero collapse
+    if abs(raw) < 0.05:
+        return 0
+
+    return raw
+    
 def compute_momentum(df):
     if df.empty:
         return 0
@@ -299,7 +283,7 @@ def run_pipeline():
     articles += fetch_rss_news(REUTERS_RSS, "Reuters")
 
     df = analyze_news_batch(articles)
-    print(df[["title", "sentiment", "confidence", "importance", "signal"]].head())
+    print(df[["title", "sentiment", "confidence", "importance", "signal"]].head(10))    
     market_signal = compute_momentum(df)
     btc_price = fetch_btc_price()
 
