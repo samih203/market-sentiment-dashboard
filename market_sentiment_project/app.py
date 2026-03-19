@@ -92,8 +92,8 @@ if len(history) > 2:
         history["btc_price"].max() - history["btc_price"].min() + 1e-9
     )
 
-chart_data = history.set_index("time")[["btc_norm", "signal_norm", "rolling_corr_scaled"]]    
-st.line_chart(chart_data)
+    chart_data = history.set_index("time")[["btc_norm", "signal_norm", "rolling_corr_scaled"]]    
+    st.line_chart(chart_data)
 
 else:
     st.write("Collecting data...")
