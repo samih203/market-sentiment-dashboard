@@ -112,7 +112,7 @@ def analyze_news_batch(articles):
     texts = []
     metadata = []
 
-    articles = articles[:25]  # limit for speed
+    articles = articles[:25]  
 
     for a in articles:
         text = a.get("title", "")
@@ -220,9 +220,10 @@ def signal_strength(row):
     }
 
     return (
-        sentiment_map.get(row["sentiment"], 0)
-        * row["confidence"]
-        * row["importance"]
+    sentiment_map.get(row["sentiment"], 0)
+    * (row["confidence"] ** 2)
+    * row["importance"]
+    * 2
     )
 def compute_momentum(df):
     if df.empty:
