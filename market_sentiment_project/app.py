@@ -36,7 +36,8 @@ elif market_signal < -0.1:
 else:
     signal_label = "🟡 HOLD"
 st.progress(min(abs(market_signal), 1.0))
-st.metric("Market Sentiment", signal_label, delta=round(market_signal, 3))st.subheader(f"BTC Price: ${btc_price}")
+st.metric("Market Sentiment", signal_label, delta=round(market_signal, 3))
+st.subheader(f"BTC Price: ${btc_price}")
 
 # ---------------------------
 # STORE HISTORY (for chart)
