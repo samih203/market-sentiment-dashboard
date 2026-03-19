@@ -9,9 +9,13 @@ if "history" not in st.session_state:
 st.set_page_config(page_title="Market Sentiment Dashboard", layout="wide")
 
 st.title("📊 Crypto Market Sentiment Dashboard")
+import time
+
+time.sleep(5)
+st.rerun()
 
 # ✅ CACHE YOUR PIPELINE
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10)
 def load_data():
     return run_pipeline()
 
