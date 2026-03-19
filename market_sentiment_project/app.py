@@ -29,15 +29,18 @@ except Exception as e:
 # ---------------------------
 # METRICS
 # ---------------------------
-if market_signal > 0.1:
+if market_signal > 0.1 and momentum > 0:
+    signal_label = "🟢 STRONG BUY"
+elif market_signal > 0:
     signal_label = "🟢 BUY"
-elif market_signal < -0.1:
+elif market_signal < -0.1 and momentum < 0:
+    signal_label = "🔴 STRONG SELL"
+elif market_signal < 0:
     signal_label = "🔴 SELL"
 else:
     signal_label = "🟡 HOLD"
-st.progress(min(abs(market_signal), 1.0))
-st.metric("Market Sentiment", signal_label, delta=round(market_signal, 3))
-st.subheader(f"BTC Price: ${btc_price}")
+
+st.metric("Market Signal", signal_label, delta=round(market_signal, 3))
 
 # ---------------------------
 # STORE HISTORY (for chart)
@@ -76,9 +79,6 @@ else:
 # ---------------------------
 # BTC vs SENTIMENT CHART
 # ---------------------------
-# ---------------------------
-# BTC vs SENTIMENT CHART
-# ---------------------------
 st.subheader("📈 BTC Price vs Sentiment (Normalized)")
 
 history = st.session_state.history.copy()
@@ -103,6 +103,23 @@ if len(history) > 2:
 else:
     st.write("Collecting data...")
 
+
+    corr = history["btc_norm"].corr(history["signal_norm"])
+
+    st.metric("BTC vs Sentiment Correlation", round(corr, 3))
+
+    history["signal_shifted"] = history["signal_norm"].shift(1)
+    
+    lead_corr = history["signal_shifted"].corr(history["btc_norm"])
+
+    st.metric("Sentiment Leading Indicator", round(lead_corr, 3))
+
+
+    history["signal_momentum"] = history["signal_norm"].diff()
+
+    momentum = history["signal_momentum"].iloc[-1]
+
+    st.metric("Sentiment Momentum", round(momentum, 3))
 # ---------------------------
 # MANUAL REFRESH BUTTON
 # ---------------------------
