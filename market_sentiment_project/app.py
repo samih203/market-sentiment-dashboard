@@ -84,6 +84,41 @@ history["rolling_corr_scaled"] = (history["rolling_corr"] + 1) / 2
 history["signal_momentum"] = history["signal_norm"].diff()
 history["signal_volatility"] = history["signal_norm"].rolling(5).std()
 
+#=====================
+#PREDICTION
+#=====================
+# Future BTC movement (1 step ahead)
+history["future_price"] = history["btc_price"].shift(-1)
+
+history["future_return"] = (
+    history["future_price"] - history["btc_price"]
+) / history["btc_price"]
+# Predictive score
+history["predictive_score"] = (
+    history["signal_norm"] * 0.5 +
+    history["signal_momentum"].fillna(0) * 0.3 +
+    history["rolling_corr"].fillna(0) * 0.2
+)
+# Does score predict returns?
+prediction_corr = history["predictive_score"].corr(history["future_return"])
+
+st.metric("Prediction Accuracy", round(prediction_corr, 3))
+
+pred_score = history["predictive_score"].iloc[-1]
+
+if pred_score > 0.15:
+    signal_label = "🟢 PREDICT BUY"
+
+elif pred_score < -0.15:
+    signal_label = "🔴 PREDICT SELL"
+
+else:
+    signal_label = "🟡 NO EDGE"
+
+history["pred_scaled"] = (history["predictive_score"] + 1) / 2
+
+
+
 if len(history) > 2:
     # Normalize
     history["btc_norm"] = (
@@ -92,7 +127,12 @@ if len(history) > 2:
         history["btc_price"].max() - history["btc_price"].min() + 1e-9
     )
 
-    chart_data = history.set_index("time")[["btc_norm", "signal_norm", "rolling_corr_scaled"]]    
+    chart_data = history.set_index("time")[[
+    "btc_norm",
+    "signal_norm",
+    "rolling_corr_scaled",
+    "pred_scaled"
+    ]]
     st.line_chart(chart_data)
 
 else:
@@ -167,3 +207,6 @@ if st.button("Refresh Data"):
 import time
 time.sleep(5)
 st.rerun()
+
+
+
