@@ -62,7 +62,8 @@ def shorten_text(text, max_words=200):
     return " ".join(text.split()[:max_words])
 
 def get_article_content(article):
-    url = article.get("url")
+    title = article.get("title", "")
+    return title if title else ""
 
     if not url:
         return article.get("title", "")
@@ -137,16 +138,25 @@ def analyze_news_batch(articles):
     rows = []
 
     for r, a in zip(results, metadata):
-        sentiment = label_map.get(r["label"], "neutral")
-        confidence = float(r["score"])
+        try:
+            sentiment = {
+                "POSITIVE": 1,
+                "NEGATIVE": -1,
+                "NEUTRAL": 0
+            }.get(r["label"], 0)
 
-        rows.append({
-    "title": a["title"],
-    "sentiment": label_map.get(r["label"], 0),
-    "confidence": float(r["score"]),
-    "published_at": a["published_at"],
-    "source": a["source"]
-    })
+            confidence = float(r["score"])
+
+            rows.append({
+                "title": a["title"],
+                "sentiment": sentiment,
+                "confidence": confidence,
+                "published_at": a["published_at"],
+                "source": a["source"]
+            })
+
+    except Exception as e:
+        print("ROW ERROR:", e)
 
     # Create DataFrame
     df = pd.DataFrame(rows)
@@ -158,6 +168,8 @@ def analyze_news_batch(articles):
     # Compute importance + signal
     df["importance"] = df.apply(compute_importance, axis=1)
     df["signal"] = df.apply(signal_strength, axis=1)
+    print("SIGNAL STATS:")
+    print(df["signal"].describe())
 
     print("IMPORTANCE CHECK:")
     print(df["importance"].describe())
