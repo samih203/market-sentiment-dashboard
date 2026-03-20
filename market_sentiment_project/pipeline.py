@@ -110,7 +110,7 @@ def analyze_news_batch(articles):
         if not text:
             continue
 
-        short_text = shorten_text(text)
+        short_text = text * 3  
 
         texts.append(short_text)
         metadata.append(a)
@@ -118,12 +118,14 @@ def analyze_news_batch(articles):
     # Run sentiment in batch
     results = batch_sentiment(texts)
 
-    label_map = {
-    "POSITIVE": 1,
-    "NEGATIVE": -1,
-    "NEUTRAL": 0
-    }
+    sentiment = {
+        "positive": 1,
+        "negative": -1,
+        "neutral": 0
+    }.get(r["label"].lower(), 0)
 
+    print("RAW MODEL OUTPUT:")
+    print(results[:5])
     rows = []
 
     for r, a in zip(results, metadata):
@@ -179,14 +181,14 @@ def analyze_news_batch(articles):
 # ---------------------------
 
 IMPORTANT_KEYWORDS = {
-    "bitcoin": 0.6,
-    "ethereum": 0.6,
-    "etf": 0.8,
-    "sec": 0.8,
-    "crash": 1.0,
-    "surge": 1.0,
-    "inflation": 0.7,
-    "fed": 0.8
+    "bitcoin": 1.0,
+    "ethereum": 1.0,
+    "etf": 1.2,
+    "sec": 1.2,
+    "crash": 2.0,
+    "surge": 2.0,
+    "inflation": 1.5,
+    "fed": 1.5
 }
 
 SOURCE_WEIGHTS = {
