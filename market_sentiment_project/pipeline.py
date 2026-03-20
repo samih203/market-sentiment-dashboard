@@ -102,31 +102,23 @@ def analyze_news_batch(articles):
     texts = []
     metadata = []
 
-    articles = articles[:50]  
-
-    for a in articles:
+    for a in articles[:50]:
         text = a.get("title", "")
+        if text:
+            texts.append(text)
+            metadata.append(a)
 
-        if not text:
-            continue
+    if not texts:
+        return pd.DataFrame()
 
-        short_text = text * 3  
-
-        texts.append(short_text)
-        metadata.append(a)
-
-    # Run sentiment in batch
     results = batch_sentiment(texts)
-
-    sentiment = {
-        "positive": 1,
-        "negative": -1,
-        "neutral": 0
-    }.get(r["label"].lower(), 0)
 
     rows = []
 
-    for r, a in zip(results, metadata):
+    for i in range(len(results)):
+        r = results[i]
+        a = metadata[i]
+
         try:
             sentiment = {
                 "positive": 1,
@@ -134,12 +126,10 @@ def analyze_news_batch(articles):
                 "neutral": 0
             }.get(r["label"].lower(), 0)
 
-            confidence = float(r["score"])
-
             rows.append({
                 "title": a["title"],
                 "sentiment": sentiment,
-                "confidence": confidence,
+                "confidence": float(r["score"]),
                 "published_at": a["published_at"],
                 "source": a["source"]
             })
@@ -147,31 +137,16 @@ def analyze_news_batch(articles):
         except Exception as e:
             print("ROW ERROR:", e)
 
-    # Create DataFrame
     df = pd.DataFrame(rows)
 
-    # Safety check
     if df.empty:
         return df
 
-    # Compute importance + signal
     df["importance"] = df.apply(compute_importance, axis=1)
     df["signal"] = df.apply(signal_strength, axis=1)
-    print("SIGNAL STATS:")
-    print(df["signal"].describe())
-
-    print("IMPORTANCE CHECK:")
-    print(df["importance"].describe())
-
-    print("\nSENTIMENT COUNTS:")
-    print(df["sentiment"].value_counts())
-
-    print("\nSIGNAL SAMPLE:")
-    print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
-
     df["time_weight"] = df["published_at"].apply(time_decay)
     df["weighted_signal"] = df["signal"] * df["time_weight"]
-    
+
     return df
 
 # ---------------------------
