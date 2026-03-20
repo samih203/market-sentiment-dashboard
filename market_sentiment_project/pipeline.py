@@ -116,16 +116,16 @@ def analyze_news_batch(articles):
         metadata.append(a)
 
     # Run sentiment in batch
-    results = batch_sentiment(texts)
+        results = batch_sentiment(texts)
 
-    sentiment = {
-        "positive": 1,
-        "negative": -1,
-        "neutral": 0
-    }.get(r["label"].lower(), 0)
+        sentiment = {
+            "positive": 1,
+            "negative": -1,
+            "neutral": 0
+        }.get(r["label"].lower(), 0)
 
-    print("RAW MODEL OUTPUT:")
-    print(results[:5])
+        print("RAW MODEL OUTPUT:")
+        print(results[:5])
     
 
     rows = []
