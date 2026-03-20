@@ -55,13 +55,14 @@ if not df.empty:
     top = df.sort_values("abs_signal", ascending=False).head(10)
 
     st.subheader("Top Market Signals")
-    
+
     top["direction"] = top["signal"].apply(
         lambda x: "🟢 Bullish" if x > 0 else "🔴 Bearish"
     )
 
-st.dataframe(top[["source","title","direction","signal"]])
+    st.dataframe(top[["source","title","direction","signal"]])
     st.bar_chart(top.set_index("title")["signal"])
+
 else:
     st.warning("No data available from pipeline.")
 
@@ -98,71 +99,60 @@ def get_color(signal):
         return "gray"
 
 st.markdown(f"### Market Sentiment: :{get_color(market_signal)}[{round(market_signal,3)}]")
-#=====================
-#PREDICTION
-#=====================
-# Future BTC movement (1 step ahead)
+# =====================
+# PREDICTION
+# =====================
 history["future_price"] = history["btc_price"].shift(-1)
 
 history["future_return"] = (
     history["future_price"] - history["btc_price"]
 ) / history["btc_price"]
-# Predictive score
+
 history["predictive_score"] = (
     history["signal_norm"] * 0.5 +
     history["signal_momentum"].fillna(0) * 0.3 +
     history["rolling_corr"].fillna(0) * 0.2
 )
-# Does score predict returns?
-prediction_corr = history["predictive_score"].corr(history["future_return"])
-
-st.metric(
-    "Market Signal",
-    signal_label,
-    delta=f"{round(market_signal,3)} strength"
-)
 
 pred_score = history["predictive_score"].iloc[-1]
 
 if pred_score > 0.15:
-    signal_label = "🟢 PREDICT BUY"
-
+    prediction_label = "🟢 PREDICT BUY"
 elif pred_score < -0.15:
-    signal_label = "🔴 PREDICT SELL"
-
+    prediction_label = "🔴 PREDICT SELL"
 else:
-    signal_label = "🟡 NO EDGE"
+    prediction_label = "🟡 NO EDGE"
 
+st.metric("Prediction", prediction_label, delta=round(pred_score, 3))
+
+# Scale for visualization
 history["pred_scaled"] = (history["predictive_score"] + 1) / 2
 
 
 
-if len(history) > 2:
-    # Normalize
-    history["btc_norm"] = (
-        history["btc_price"] - history["btc_price"].min()
-    ) / (
-        history["btc_price"].max() - history["btc_price"].min() + 1e-9
-    )
-
+if len(history) > 5:
     chart_data = history.set_index("time")[[
-    "btc_norm",
-    "signal_norm",
-    "rolling_corr_scaled",
-    "pred_scaled"
+        "btc_norm",
+        "signal_norm",
+        "rolling_corr_scaled",
+        "pred_scaled"
     ]]
-    st.subheader("📈 BTC Price")
-    st.line_chart(history.set_index("time")["btc_price"])
 
-    st.subheader("🧠 Sentiment Signal")
-    st.line_chart(history.set_index("time")["signal"])
+    st.subheader("📊 Combined Market Signals")
+    st.line_chart(chart_data)
 
+    st.caption("""
+    Blue = BTC (normalized)  
+    Orange = Sentiment  
+    Green = Correlation  
+    Red = Prediction  
+    """)
 else:
     st.write("Collecting data...")
 
 
-momentum = history["signal_momentum"].iloc[-1]
-volatility = history["signal_volatility"].iloc[-1]
+momentum = history["signal_momentum"].iloc[-1] if len(history) > 1 else 0
+volatility = history["signal_volatility"].iloc[-1] if len(history) > 3 else 0
 confidence = abs(market_signal) * (1 + abs(momentum))
 
 # Correlation
