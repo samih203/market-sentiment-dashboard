@@ -127,28 +127,29 @@ def analyze_news_batch(articles):
     print("RAW MODEL OUTPUT:")
     print(results[:5])
     
-    rows = []
 
-    for r, a in zip(results, metadata):
-        try:
-            sentiment = {
-                "positive": 1,
-                "negative": -1,
-                "neutral": 0
-            }.get(r["label"].lower(), 0)
+rows = []
 
-            confidence = float(r["score"])
+for r, a in zip(results, metadata):
+    try:
+        sentiment = {
+            "positive": 1,
+            "negative": -1,
+            "neutral": 0
+        }.get(r["label"].lower(), 0)
 
-            rows.append({
-                "title": a["title"],
-                "sentiment": sentiment,
-                 "confidence": confidence,
-                "published_at": a["published_at"],
-                "source": a["source"]
-            })
+        confidence = float(r["score"])
 
-        except Exception as e:
-            print("ROW ERROR:", e)
+        rows.append({
+            "title": a["title"],
+            "sentiment": sentiment,
+            "confidence": confidence,
+            "published_at": a["published_at"],
+            "source": a["source"]
+        })
+
+    except Exception as e:
+        print("ROW ERROR:", e)
 
     # Create DataFrame
     df = pd.DataFrame(rows)
