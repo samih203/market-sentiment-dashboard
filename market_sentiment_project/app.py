@@ -102,14 +102,15 @@ st.markdown(f"### Market Sentiment: :{get_color(market_signal)}[{round(market_si
 # =====================
 # PREDICTION
 # =====================
-history["future_price"] = history["btc_price"].shift(-1)
+history["returns"] = history["btc_price"].pct_change()
+history["future_return"] = history["returns"].shift(-1)
 
 history["future_return"] = (
     history["future_price"] - history["btc_price"]
 ) / history["btc_price"]
 
 history["predictive_score"] = (
-    history["signal_norm"] * 0.5 +
+    history["signal"] * 0.5 +
     history["signal_momentum"].fillna(0) * 0.3 +
     history["rolling_corr"].fillna(0) * 0.2
 )
@@ -130,6 +131,14 @@ history["pred_scaled"] = (history["predictive_score"] + 1) / 2
 
 
 
+prediction_corr = history["predictive_score"].corr(history["future_return"])
+
+st.metric("Prediction Accuracy (corr)", round(prediction_corr, 3))
+
+
+#===============
+#CHART
+#===============
 if len(history) > 5:
     chart_data = history.set_index("time")[[
         "btc_norm",
