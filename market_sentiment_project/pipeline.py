@@ -138,13 +138,13 @@ def analyze_news_batch(articles):
 
             confidence = float(r["score"])
 
-            rows.append({
-                "title": a["title"],
-                "sentiment": sentiment,
-                "confidence": confidence,
-                "published_at": a["published_at"],
-                "source": a["source"]
-            })
+    rows.append({
+         "title": a["title"],
+          "sentiment": sentiment,
+          "confidence": confidence,
+           "published_at": a["published_at"],
+          "source": a["source"]
+     })
 
         except Exception as e:
             print("ROW ERROR:", e)
