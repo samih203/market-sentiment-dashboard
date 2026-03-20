@@ -186,7 +186,27 @@ def compute_importance(row):
 
 
 def signal_strength(row):
-    raw = row["sentiment"] * row["confidence"] * row["importance"]
+    text = str(row["title"]).lower()
+
+    # Base ML signal
+    ml_signal = row["sentiment"] * row["confidence"]
+
+    # Keyword override (STRONG directional bias)
+    keyword_boost = 0
+
+    if any(k in text for k in ["crash", "collapse", "lawsuit", "ban", "hack"]):
+        keyword_boost -= 0.7
+
+    if any(k in text for k in ["surge", "rally", "approval", "etf", "adoption"]):
+        keyword_boost += 0.7
+
+    # Combine
+    raw = (ml_signal * 0.6) + (keyword_boost * 0.4)
+
+    # Apply importance AFTER direction is established
+    final = raw * row["importance"]
+
+    return final
 
     return raw
     
@@ -229,15 +249,11 @@ def compute_momentum(df):
     if df.empty:
         return 0
 
-    if "weighted_signal" not in df or "time_weight" not in df:
-        return df["signal"].mean()
+    # exponential weighting (recent news matters more)
+    weights = pd.Series(range(1, len(df)+1))
+    weights = weights / weights.sum()
 
-    total_weight = df["time_weight"].sum()
-
-    if total_weight == 0:
-        return df["signal"].mean()
-
-    return df["weighted_signal"].sum() / total_weight
+    return (df["signal"] * weights).sum()
 # =========================
 # MAIN PIPELINE
 # =========================
