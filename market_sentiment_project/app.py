@@ -86,7 +86,7 @@ history["rolling_corr"] = history["btc_norm"].rolling(5).corr(history["signal_no
 history["rolling_corr_scaled"] = (history["rolling_corr"] + 1) / 2
 
 
-history["signal_momentum"] = history["signal_norm"].diff()
+history["signal_momentum"] = history["signal"].diff()
 history["signal_volatility"] = history["signal"].rolling(3).std()
 
 
@@ -105,13 +105,13 @@ st.markdown(f"### Market Sentiment: :{get_color(market_signal)}[{round(market_si
 history["returns"] = history["btc_price"].pct_change()
 history["future_return"] = history["returns"].shift(-1)
 
-history["future_return"] = (
-    history["future_price"] - history["btc_price"]
-) / history["btc_price"]
+history["momentum_norm"] = (
+    history["signal_momentum"] / (history["signal_momentum"].abs().max() + 1e-9)
+)
 
 history["predictive_score"] = (
-    history["signal"] * 0.5 +
-    history["signal_momentum"].fillna(0) * 0.3 +
+    history["signal_norm"] * 0.5 +
+    history["momentum_norm"].fillna(0) * 0.3 +
     history["rolling_corr"].fillna(0) * 0.2
 )
 
@@ -131,8 +131,12 @@ history["pred_scaled"] = (history["predictive_score"] + 1) / 2
 
 
 
-prediction_corr = history["predictive_score"].corr(history["future_return"])
+valid = history.dropna()
 
+prediction_corr = (
+    valid["predictive_score"].corr(valid["future_return"])
+    if len(valid) > 5 else 0
+)
 st.metric("Prediction Accuracy (corr)", round(prediction_corr, 3))
 
 
@@ -146,7 +150,10 @@ if len(history) > 5:
         "rolling_corr_scaled",
         "pred_scaled"
     ]]
+    st.subheader("📊 Combined Signals View")
+    st.line_chart(chart_data)
 
+    
     st.subheader("📈 BTC Price")
     st.line_chart(history.set_index("time")["btc_price"])
 
@@ -184,7 +191,7 @@ elif momentum < 0:
 else:
     st.info("➡️ Sentiment Flat")
 
-latest_corr = history["rolling_corr"].iloc[-1]
+latest_corr = history["rolling_corr"].iloc[-1] if len(history) > 5 else 0
 
 if latest_corr > 0.5:
     st.success("📈 Strong positive correlation (trend confirmation)")
@@ -197,7 +204,10 @@ else:
 
 history["strategy_return"] = history["predictive_score"].shift(1) * history["returns"]
 
-cumulative = (1 + history["strategy_return"].fillna(0)).cumprod()
+history["buy_hold"] = (1 + history["returns"].fillna(0)).cumprod()
+
+st.subheader("💰 Strategy vs BTC")
+st.line_chart(history.set_index("time")[["buy_hold", "strategy_return"]].cumprod())
 
 st.subheader("💰 Strategy Performance")
 st.line_chart(cumulative)
