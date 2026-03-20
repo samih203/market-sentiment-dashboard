@@ -62,11 +62,7 @@ def shorten_text(text, max_words=200):
     return " ".join(text.split()[:max_words])
 
 def get_article_content(article):
-    title = article.get("title", "")
-    return title if title else ""
-
-    if not url:
-        return article.get("title", "")
+    return article.get("title", "")
 
     text = article.get("title")
 
@@ -137,23 +133,23 @@ def analyze_news_batch(articles):
 
     rows = []
 
-    for r, a in zip(results, metadata):
-        try:
-            sentiment = {
-                "POSITIVE": 1,
-                "NEGATIVE": -1,
-                "NEUTRAL": 0
-            }.get(r["label"], 0)
+for r, a in zip(results, metadata):
+    try:
+        sentiment = {
+            "POSITIVE": 1,
+            "NEGATIVE": -1,
+            "NEUTRAL": 0
+        }.get(r["label"], 0)
 
-            confidence = float(r["score"])
+        confidence = float(r["score"])
 
-            rows.append({
-                "title": a["title"],
-                "sentiment": sentiment,
-                "confidence": confidence,
-                "published_at": a["published_at"],
-                "source": a["source"]
-            })
+        rows.append({
+            "title": a["title"],
+            "sentiment": sentiment,
+            "confidence": confidence,
+            "published_at": a["published_at"],
+            "source": a["source"]
+        })
 
     except Exception as e:
         print("ROW ERROR:", e)
@@ -230,11 +226,6 @@ def signal_strength(row):
 
     return raw
     
-def compute_momentum(df):
-    if df.empty:
-        return 0
-
-    return df["weighted_signal"].sum()
 # =========================
 # BTC PRICE
 # =========================
