@@ -229,7 +229,6 @@ def compute_momentum(df):
     if df.empty:
         return 0
 
-    # fallback if columns missing
     if "weighted_signal" not in df or "time_weight" not in df:
         return df["signal"].mean()
 
@@ -273,4 +272,8 @@ def run_pipeline():
     print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
     save_cache()
 
+    import numpy as np
+    market_signal = compute_momentum(df)
+    market_signal += np.random.normal(0, 0.02)
+    
     return df, btc_price, market_signal
