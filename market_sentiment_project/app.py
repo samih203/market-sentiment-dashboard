@@ -147,15 +147,14 @@ if len(history) > 5:
         "pred_scaled"
     ]]
 
-    st.subheader("📊 Combined Market Signals")
-    st.line_chart(chart_data)
+    st.subheader("📈 BTC Price")
+    st.line_chart(history.set_index("time")["btc_price"])
 
-    st.caption("""
-    Blue = BTC (normalized)  
-    Orange = Sentiment  
-    Green = Correlation  
-    Red = Prediction  
-    """)
+    st.subheader("🧠 Sentiment Signal")
+    st.line_chart(history.set_index("time")["signal"])
+
+    st.subheader("🔮 Predictive Score")
+    st.line_chart(history.set_index("time")["predictive_score"])
 else:
     st.write("Collecting data...")
 
@@ -193,6 +192,15 @@ elif latest_corr < -0.5:
     st.warning("⚠️ Strong negative correlation (possible reversal)")
 else:
     st.info("➖ Weak correlation (no clear signal)")
+
+
+
+history["strategy_return"] = history["predictive_score"].shift(1) * history["returns"]
+
+cumulative = (1 + history["strategy_return"].fillna(0)).cumprod()
+
+st.subheader("💰 Strategy Performance")
+st.line_chart(cumulative)
 # ---------------------------
 # METRICS
 # ---------------------------
