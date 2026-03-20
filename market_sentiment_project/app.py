@@ -55,8 +55,12 @@ if not df.empty:
     top = df.sort_values("abs_signal", ascending=False).head(10)
 
     st.subheader("Top Market Signals")
-    st.dataframe(top[["source","title","sentiment","confidence","signal"]])
+    
+    top["direction"] = top["signal"].apply(
+        lambda x: "🟢 Bullish" if x > 0 else "🔴 Bearish"
+    )
 
+st.dataframe(top[["source","title","direction","signal"]])
     st.bar_chart(top.set_index("title")["signal"])
 else:
     st.warning("No data available from pipeline.")
@@ -82,8 +86,18 @@ history["rolling_corr_scaled"] = (history["rolling_corr"] + 1) / 2
 
 
 history["signal_momentum"] = history["signal_norm"].diff()
-history["signal_volatility"] = history["signal_norm"].rolling(5).std()
+history["signal_volatility"] = history["signal"].rolling(3).std()
 
+
+def get_color(signal):
+    if signal > 0.1:
+        return "green"
+    elif signal < -0.1:
+        return "red"
+    else:
+        return "gray"
+
+st.markdown(f"### Market Sentiment: :{get_color(market_signal)}[{round(market_signal,3)}]")
 #=====================
 #PREDICTION
 #=====================
@@ -102,7 +116,11 @@ history["predictive_score"] = (
 # Does score predict returns?
 prediction_corr = history["predictive_score"].corr(history["future_return"])
 
-st.metric("Prediction Accuracy", round(prediction_corr, 3))
+st.metric(
+    "Market Signal",
+    signal_label,
+    delta=f"{round(market_signal,3)} strength"
+)
 
 pred_score = history["predictive_score"].iloc[-1]
 
@@ -133,7 +151,11 @@ if len(history) > 2:
     "rolling_corr_scaled",
     "pred_scaled"
     ]]
-    st.line_chart(chart_data)
+    st.subheader("📈 BTC Price")
+    st.line_chart(history.set_index("time")["btc_price"])
+
+    st.subheader("🧠 Sentiment Signal")
+    st.line_chart(history.set_index("time")["signal"])
 
 else:
     st.write("Collecting data...")
@@ -157,6 +179,12 @@ st.metric("Sentiment Leading Indicator", round(lead_corr, 3))
 # Momentum display
 st.metric("Sentiment Momentum", round(momentum, 3))
 
+if momentum > 0:
+    st.success("📈 Sentiment Trending Up")
+elif momentum < 0:
+    st.error("📉 Sentiment Trending Down")
+else:
+    st.info("➡️ Sentiment Flat")
 
 latest_corr = history["rolling_corr"].iloc[-1]
 
