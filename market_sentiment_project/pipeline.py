@@ -64,13 +64,6 @@ def shorten_text(text, max_words=200):
 def get_article_content(article):
     return article.get("title", "")
 
-    text = article.get("title")
-
-    if not text or len(text.split()) < 50:
-        return article.get("title", "")
-
-    return text
-
 # =========================
 # BATCH SENTIMENT (FAST)
 # =========================
@@ -146,7 +139,7 @@ def analyze_news_batch(articles):
             rows.append({
                 "title": a["title"],
                 "sentiment": sentiment,
-                 "confidence": confidence,
+                "confidence": confidence,
                 "published_at": a["published_at"],
                 "source": a["source"]
             })
@@ -219,10 +212,6 @@ def compute_importance(row):
 
 def signal_strength(row):
     raw = row["sentiment"] * row["confidence"] * row["importance"]
-
-    # prevent zero collapse
-    if abs(raw) < 0.05:
-        return 0
 
     return raw
     
