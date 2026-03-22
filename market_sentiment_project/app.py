@@ -244,18 +244,29 @@ load_model()
 # ============================================================
 # PIPELINE CACHE  (5-minute TTL — FinBERT is slow)
 # ============================================================
-@st.cache_data(ttl=300, show_spinner="Fetching signals…")
-def load_data():
+# Pipeline (NLP-heavy) cached for 60s — prices fetched live every rerun
+@st.cache_data(ttl=60, show_spinner="Fetching signals…")
+def load_pipeline():
     return run_pipeline()
 
 # ============================================================
 # SAFE LOAD
 # ============================================================
 try:
-    df, prices, market_signal = load_data()
+    _df_cached, _prices_cached, market_signal = load_pipeline()
 except Exception as e:
     st.error(f"Pipeline error: {e}")
     st.stop()
+
+# Deep-copy df so Streamlit cache mutation protection never silently no-ops
+df = _df_cached.copy(deep=True) if not _df_cached.empty else _df_cached
+
+# Always fetch fresh prices (fast, no NLP) so chart updates every rerun
+from pipeline import fetch_prices as _fetch_prices
+try:
+    prices = _fetch_prices(ttl=30)
+except Exception:
+    prices = _prices_cached
 
 btc_price  = prices.get("btc", 0)
 eth_price  = prices.get("eth", 0)
@@ -274,13 +285,17 @@ if "alerts" not in st.session_state:
 
 new_row = pd.DataFrame([{
     "time":      pd.Timestamp.now(),
-    "btc_price": btc_price,
-    "eth_price": eth_price,
-    "signal":    market_signal,
+    "btc_price": float(btc_price),
+    "eth_price": float(eth_price),
+    "signal":    float(market_signal),
 }])
-st.session_state.history = pd.concat(
-    [st.session_state.history, new_row], ignore_index=True
-).tail(100)
+
+# Only append if price or signal actually changed (avoids flat duplicate rows)
+_h = st.session_state.history
+if _h.empty or float(btc_price) != float(_h["btc_price"].iloc[-1]) or float(market_signal) != float(_h["signal"].iloc[-1]):
+    st.session_state.history = pd.concat(
+        [_h, new_row], ignore_index=True
+    ).tail(100)
 
 history = st.session_state.history.copy()
 
@@ -839,7 +854,7 @@ with tab_settings:
     st.caption("Model: ProsusAI/FinBERT  |  Pipeline TTL: 300s  |  Price TTL: 60s")
 
 # ============================================================
-# AUTO-REFRESH  (30 s — sensible given FinBERT latency)
+# AUTO-REFRESH every 15s — prices update each rerun, NLP cached separately
 # ============================================================
-time.sleep(30)
+time.sleep(15)
 st.rerun()
