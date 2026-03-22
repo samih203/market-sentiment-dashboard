@@ -1,9 +1,8 @@
-streamlit
-pandas
-matplotlib
-feedparser
-requests
-transformers
-torch
-pycoingecko
-newspaper3k
+streamlit>=1.35.0
+plotly>=5.22.0
+pandas>=2.2.0
+numpy>=1.26.0
+feedparser>=6.0.11
+transformers>=4.40.0
+torch>=2.3.0
+pycoingecko>=3.1.0
