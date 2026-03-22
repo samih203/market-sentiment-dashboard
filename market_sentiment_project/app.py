@@ -602,17 +602,22 @@ with tab_signals:
     if df.empty:
         st.warning("No articles loaded — check your RSS feeds.")
     else:
-        df["abs_signal"] = df["signal"].abs()
-        top = df.sort_values("abs_signal", ascending=False).head(20).copy()
+        # Work on a clean copy — never mutate the cached df
+        top = df.copy()
+        top["abs_signal"] = top["signal"].abs()
+        top = top.sort_values("abs_signal", ascending=False).head(20).reset_index(drop=True)
         top["direction"] = top["signal"].apply(
             lambda x: "🟢 Bullish" if x > 0 else "🔴 Bearish"
         )
-        top["signal_fmt"] = top["signal"].apply(lambda x: f"{x:+.3f}")
+        # Strip timezone so st.dataframe renders the column cleanly
+        top["published"] = pd.to_datetime(
+            top["published_at"], utc=True, errors="coerce"
+        ).dt.tz_localize(None)
 
         # Filter controls
         fc1, fc2, fc3 = st.columns([2, 2, 3])
         with fc1:
-            src_filter = st.selectbox("Source", ["All"] + sorted(df["source"].unique().tolist()))
+            src_filter = st.selectbox("Source", ["All"] + sorted(top["source"].unique().tolist()))
         with fc2:
             dir_filter = st.selectbox("Direction", ["All", "Bullish", "Bearish"])
         with fc3:
@@ -625,40 +630,41 @@ with tab_signals:
             mask &= top["signal"] > 0
         elif dir_filter == "Bearish":
             mask &= top["signal"] < 0
-        filtered = top[mask]
+        filtered = top[mask].reset_index(drop=True)
 
         st.markdown("### Top Signals")
-        st.dataframe(
-            filtered[["source", "title", "direction", "signal_fmt",
-                       "confidence", "importance", "published_at"]].rename(columns={
-                "signal_fmt": "signal", "published_at": "published"
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
+        if filtered.empty:
+            st.info("No signals match the current filters.")
+        else:
+            # Build display df: format signal as string for display only
+            display = filtered[["source", "title", "direction",
+                                 "signal", "confidence", "importance", "published"]].copy()
+            display["signal"] = display["signal"].apply(lambda x: f"{x:+.3f}")
+            st.dataframe(display, use_container_width=True, hide_index=True)
 
         # ── horizontal bar chart ──
         st.markdown("### Signal Strength")
-        bar_data = filtered.nlargest(15, "abs_signal")
-        bar_colors = [GREEN if v > 0 else RED for v in bar_data["signal"]]
+        if not filtered.empty:
+            bar_data = filtered.nlargest(15, "abs_signal")
+            bar_colors = [GREEN if v > 0 else RED for v in bar_data["signal"]]
+            fig_bar = go.Figure(go.Bar(
+                x=bar_data["signal"],
+                y=bar_data["title"].str[:55] + "…",
+                orientation="h",
+                marker_color=bar_colors,
+                hovertemplate="%{y}<br>Signal: %{x:.3f}<extra></extra>",
+            ))
+            fig_bar.add_vline(x=0, line=dict(color="rgba(255,255,255,0.15)", width=1))
+            layout = {**PLOTLY_LAYOUT}
+            layout["margin"] = dict(l=320, r=20, t=20, b=40)
+            fig_bar.update_layout(**layout, height=max(300, len(bar_data) * 32))
+            fig_bar.update_yaxes(autorange="reversed")
+            st.plotly_chart(fig_bar, use_container_width=True)
 
-        fig_bar = go.Figure(go.Bar(
-            x=bar_data["signal"],
-            y=bar_data["title"].str[:55] + "…",
-            orientation="h",
-            marker_color=bar_colors,
-            hovertemplate="%{y}<br>Signal: %{x:.3f}<extra></extra>",
-        ))
-        fig_bar.add_vline(x=0, line=dict(color="rgba(255,255,255,0.15)", width=1))
-        layout = {**PLOTLY_LAYOUT}
-        layout["margin"] = dict(l=320, r=20, t=20, b=40)
-        fig_bar.update_layout(**layout, height=max(300, len(bar_data) * 32))
-        fig_bar.update_yaxes(autorange="reversed")
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-        # ── CSV export ──
-        csv = filtered[["source", "title", "direction", "signal",
-                         "confidence", "importance", "published_at"]].to_csv(index=False)
+        # ── CSV export — use numeric signal, not formatted string ──
+        csv_df = filtered[["source", "title", "direction", "signal",
+                            "confidence", "importance", "published"]].copy() if not filtered.empty else top[["source", "title", "direction", "signal", "confidence", "importance", "published"]].copy()
+        csv = csv_df.to_csv(index=False)
         st.download_button(
             label="⬇  Export signals CSV",
             data=csv,
