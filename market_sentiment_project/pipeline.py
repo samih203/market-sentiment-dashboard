@@ -217,6 +217,15 @@ cg = CoinGeckoAPI()
 
 import time
 
+def fetch_prices():
+    data = cg.get_price(
+        ids="bitcoin,ethereum",
+        vs_currencies="usd"
+    )
+    return {
+        "btc": data["bitcoin"]["usd"],
+        "eth": data["ethereum"]["usd"]
+    }
 BTC_CACHE = {
     "price": None,
     "timestamp": 0
@@ -225,6 +234,7 @@ BTC_CACHE = {
 def fetch_btc_price():
     now = time.time()
 
+    
     # cache for 60 seconds
     if BTC_CACHE["price"] is not None and now - BTC_CACHE["timestamp"] < 60:
         return BTC_CACHE["price"]
@@ -288,8 +298,12 @@ def run_pipeline():
     print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
     save_cache()
 
+    prices = fetch_prices()
+    btc_price = prices["btc"]
+    eth_price = prices["eth"]
+
     import numpy as np
     market_signal = compute_momentum(df)
     market_signal += np.random.normal(0, 0.02)
     
-    return df, btc_price, market_signal
+    return df, btc_price, eth_price, market_signal
