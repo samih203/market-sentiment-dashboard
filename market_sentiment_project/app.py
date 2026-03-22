@@ -21,7 +21,7 @@ def load_data():
 # SAFE DATA LOAD
 # ---------------------------
 try:
-    df, btc_price, market_signal = load_data()
+    df, btc_price, eth_price, market_signal = load_data()
 except Exception as e:
     st.error(f"Pipeline error: {e}")
     st.stop()
@@ -36,6 +36,7 @@ if "history" not in st.session_state:
 new_row = pd.DataFrame([{
     "time": pd.Timestamp.now(),
     "btc_price": btc_price,
+    "eth_price": eth_price,
     "signal": market_signal
 }])
 
@@ -106,8 +107,28 @@ st.markdown(f"### Market Sentiment: :{get_color(market_signal)}[{round(market_si
 # =====================
 # PREDICTION
 # =====================
-history["returns"] = history["btc_price"].pct_change()
+history["btc_returns"] = history["btc_price"].pct_change()
+history["eth_returns"] = history["eth_price"].pct_change()
 history["future_return"] = history["returns"].shift(-1)
+
+history["btc_strategy"] = (
+    history["position"].shift(1) * history["btc_returns"]
+)
+
+history["eth_strategy"] = (
+    history["position"].shift(1) * history["eth_returns"]
+)
+
+#=====================
+#EQUITY CURVE
+#====================
+history["btc_curve"] = (1 + history["btc_returns"].fillna(0)).cumprod()
+history["eth_curve"] = (1 + history["eth_returns"].fillna(0)).cumprod()
+
+history["btc_strategy_curve"] = (1 + history["btc_strategy"].fillna(0)).cumprod()
+history["eth_strategy_curve"] = (1 + history["eth_strategy"].fillna(0)).cumprod()
+
+
 
 history["momentum_norm"] = (
     history["signal_momentum"] / (history["signal_momentum"].abs().max() + 1e-9)
@@ -242,6 +263,21 @@ st.line_chart(
 )
 st.subheader("💰 Strategy Performance")
 st.line_chart(cumulative)
+
+
+#===========================
+#MULTI-ASSET VISUALIZATION
+#===========================
+st.subheader("💰 Multi-Asset Strategy Performance")
+
+st.line_chart(
+    history.set_index("time")[[
+        "btc_curve",
+        "btc_strategy_curve",
+        "eth_curve",
+        "eth_strategy_curve"
+    ]]
+)
 # ---------------------------
 # METRICS
 # ---------------------------
