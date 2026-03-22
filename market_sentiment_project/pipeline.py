@@ -10,7 +10,6 @@ import torch
 
 torch.set_grad_enabled(False)
 
-
 import json
 import os
 
@@ -26,6 +25,7 @@ else:
 def save_cache():
     with open(CACHE_FILE, "w") as f:
         json.dump(ARTICLE_CACHE, f)
+
 # =========================
 # MODEL
 # =========================
@@ -34,27 +34,24 @@ sentiment_pipeline = pipeline(
     model="ProsusAI/finbert",
     device=-1
 )
-#==========================
+
+# ==========================
 # TIME DECAY
-#==========================
+# ==========================
 from datetime import datetime
 import pandas as pd
 
 def time_decay(published_at):
     if pd.isna(published_at):
         return 0.5
-
     try:
-        # convert to pandas datetime (handles timezone safely)
         published_at = pd.to_datetime(published_at, utc=True)
         now = pd.Timestamp.utcnow()
-
         hours_old = (now - published_at).total_seconds() / 3600
-
         return max(0.1, 1 / (1 + hours_old / 6))
-
     except:
         return 0.5
+
 # =========================
 # TEXT HELPERS
 # =========================
@@ -84,7 +81,6 @@ REUTERS_RSS = "https://feeds.reuters.com/reuters/businessNews"
 def fetch_rss_news(url, source_name):
     feed = feedparser.parse(url)
     articles = []
-
     for entry in feed.entries:
         articles.append({
             "title": entry.get("title"),
@@ -92,8 +88,60 @@ def fetch_rss_news(url, source_name):
             "published_at": pd.to_datetime(entry.get("published", None)),
             "source": source_name
         })
-
     return articles
+
+# =========================
+# IMPORTANCE & SIGNAL
+# =========================
+IMPORTANT_KEYWORDS = {
+    "bitcoin": 1.0,
+    "ethereum": 1.0,
+    "etf": 1.2,
+    "sec": 1.2,
+    "crash": 2.0,
+    "surge": 2.0,
+    "inflation": 1.5,
+    "fed": 1.5
+}
+
+SOURCE_WEIGHTS = {
+    "Reuters": 0.4,
+    "Bloomberg": 0.4,
+    "CoinDesk": 0.2,
+    "Cointelegraph": 0.2,
+    "Reddit/CryptoCurrency": 0.15
+}
+
+def compute_importance(row):
+    text = str(row["title"]).lower()
+    score = 0.4
+    for keyword, weight in IMPORTANT_KEYWORDS.items():
+        if keyword in text:
+            score += weight
+    score += SOURCE_WEIGHTS.get(row["source"], 0.1)
+    return min(score, 1.0)
+
+
+def signal_strength(row):
+    text = str(row["title"]).lower()
+
+    # Base ML signal
+    ml_signal = row["sentiment"] * row["confidence"]
+
+    # Keyword override (STRONG directional bias)
+    keyword_boost = 0
+    if any(k in text for k in ["crash", "collapse", "lawsuit", "ban", "hack"]):
+        keyword_boost -= 0.7
+    if any(k in text for k in ["surge", "rally", "approval", "etf", "adoption"]):
+        keyword_boost += 0.7
+
+    # Combine
+    raw = (ml_signal * 0.6) + (keyword_boost * 0.4)
+
+    # Apply importance AFTER direction is established
+    final = raw * row["importance"]
+
+    return final  # FIX: removed dead `return raw` below
 
 # =========================
 # ANALYZE ARTICLES
@@ -112,13 +160,11 @@ def analyze_news_batch(articles):
         return pd.DataFrame()
 
     results = batch_sentiment(texts)
-
     rows = []
 
     for i in range(len(results)):
         r = results[i]
         a = metadata[i]
-
         try:
             sentiment = {
                 "positive": 1,
@@ -133,7 +179,6 @@ def analyze_news_batch(articles):
                 "published_at": a["published_at"],
                 "source": a["source"]
             })
-
         except Exception as e:
             print("ROW ERROR:", e)
 
@@ -149,83 +194,12 @@ def analyze_news_batch(articles):
 
     return df
 
-# ---------------------------
-# Importance & Signal
-# ---------------------------
-
-IMPORTANT_KEYWORDS = {
-    "bitcoin": 1.0,
-    "ethereum": 1.0,
-    "etf": 1.2,
-    "sec": 1.2,
-    "crash": 2.0,
-    "surge": 2.0,
-    "inflation": 1.5,
-    "fed": 1.5
-}
-
-SOURCE_WEIGHTS = {
-    "Reuters": 0.4,
-    "Bloomberg": 0.4,
-    "CoinDesk": 0.2,
-    "Reddit/CryptoCurrency": 0.15
-}
-
-def compute_importance(row):
-    text = str(row["title"]).lower()
-
-    score = 0.4  
-
-    for keyword, weight in IMPORTANT_KEYWORDS.items():
-        if keyword in text:
-            score += weight
-
-    score += SOURCE_WEIGHTS.get(row["source"], 0.1)
-
-    return min(score, 1.0)
-
-
-def signal_strength(row):
-    text = str(row["title"]).lower()
-
-    # Base ML signal
-    ml_signal = row["sentiment"] * row["confidence"]
-
-    # Keyword override (STRONG directional bias)
-    keyword_boost = 0
-
-    if any(k in text for k in ["crash", "collapse", "lawsuit", "ban", "hack"]):
-        keyword_boost -= 0.7
-
-    if any(k in text for k in ["surge", "rally", "approval", "etf", "adoption"]):
-        keyword_boost += 0.7
-
-    # Combine
-    raw = (ml_signal * 0.6) + (keyword_boost * 0.4)
-
-    # Apply importance AFTER direction is established
-    final = raw * row["importance"]
-
-    return final
-
-    return raw
-    
 # =========================
 # BTC PRICE
 # =========================
 cg = CoinGeckoAPI()
-
 import time
 
-def fetch_prices():
-    data = cg.get_price(
-        ids="bitcoin,ethereum",
-        vs_currencies="usd"
-    )
-    return {
-        "btc": data["bitcoin"]["usd"],
-        "eth": data["ethereum"]["usd"]
-    }
 BTC_CACHE = {
     "price": None,
     "timestamp": 0
@@ -233,77 +207,71 @@ BTC_CACHE = {
 
 def fetch_btc_price():
     now = time.time()
-
-    
-    # cache for 60 seconds
     if BTC_CACHE["price"] is not None and now - BTC_CACHE["timestamp"] < 60:
         return BTC_CACHE["price"]
-
     try:
         price_data = cg.get_price(ids='bitcoin', vs_currencies='usd')
         price = price_data['bitcoin']['usd']
-
         BTC_CACHE["price"] = price
         BTC_CACHE["timestamp"] = now
-
         return price
-
     except Exception as e:
         print("BTC fetch error:", e)
-
-        # fallback to last known price
         return BTC_CACHE["price"] if BTC_CACHE["price"] else 0
 
+def fetch_prices():
+    try:
+        data = cg.get_price(
+            ids="bitcoin,ethereum",
+            vs_currencies="usd"
+        )
+        return {
+            "btc": data["bitcoin"]["usd"],
+            "eth": data["ethereum"]["usd"]
+        }
+    except Exception as e:
+        print("Price fetch error:", e)
+        return {"btc": 0, "eth": 0}
 
+# =========================
+# MOMENTUM
+# =========================
 def compute_momentum(df):
     if df.empty:
         return 0
-
-    # exponential weighting (recent news matters more)
-    weights = pd.Series(range(1, len(df)+1))
+    weights = pd.Series(range(1, len(df) + 1))
     weights = weights / weights.sum()
-
     return (df["signal"] * weights).sum()
+
 # =========================
 # MAIN PIPELINE
 # =========================
 def run_pipeline():
     articles = []
-
     articles += fetch_rss_news(COINDESK_RSS, "CoinDesk")
     articles += fetch_rss_news(COINTELEGRAPH_RSS, "Cointelegraph")
     articles += fetch_rss_news(REUTERS_RSS, "Reuters")
 
     df = analyze_news_batch(articles)
-    print(df[["title", "sentiment", "confidence", "importance", "signal"]].head(10))    
+
+    if not df.empty:
+        print(df[["title", "sentiment", "confidence", "importance", "signal"]].head(10))
+
+    import numpy as np
     market_signal = compute_momentum(df)
-    btc_price = fetch_btc_price()
-
-    print(f"\nBTC Price: ${btc_price}\n")
-
-    df["abs_signal"] = df["signal"].abs()
-    top = df.sort_values("abs_signal", ascending=False).head(10)
-
-    colors = ['green' if x > 0 else 'red' for x in top["signal"]]
-
-    plt.figure(figsize=(12,6))
-    plt.barh(top["title"], top["signal"], color=colors)
-    plt.xlabel("Signal Strength")
-    plt.title("Top News Sentiment Signals")
-    plt.gca().invert_yaxis()
-    plt.show()
-
-
-    print("DEBUG SIGNALS:")
-    print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
-    save_cache()
+    market_signal += np.random.normal(0, 0.02)
 
     prices = fetch_prices()
     btc_price = prices["btc"]
     eth_price = prices["eth"]
 
-    import numpy as np
-    market_signal = compute_momentum(df)
-    market_signal += np.random.normal(0, 0.02)
-    
+    print(f"\nBTC Price: ${btc_price}")
+    print(f"ETH Price: ${eth_price}\n")
+
+    if not df.empty:
+        print("DEBUG SIGNALS:")
+        print(df[["sentiment", "confidence", "importance", "signal"]].head(10))
+
+    save_cache()
+
     return df, btc_price, eth_price, market_signal
