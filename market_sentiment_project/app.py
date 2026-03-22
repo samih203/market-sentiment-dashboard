@@ -297,33 +297,54 @@ def position_size(score):
     else:              return  0.0
 
 def build_coin_history(ticker):
-    """Extract price + signal history for a single coin."""
+    """
+    Extract price + signal history for a single coin.
+    Always returns a DataFrame with ALL derived columns present,
+    even when there are fewer than 2 rows — callers can safely
+    access any column and guard only on len().
+    """
+    DERIVED_COLS = [
+        "returns", "price_norm", "signal_norm", "rolling_corr",
+        "momentum", "volatility", "pred_score",
+        "position", "strat_return", "strat_curve", "hold_curve",
+    ]
+
+    def _empty():
+        return pd.DataFrame(columns=["time", "price", "signal"] + DERIVED_COLS)
+
     p_col = f"{ticker}_price"
     s_col = f"{ticker}_signal"
-    if p_col not in history.columns:
-        return pd.DataFrame()
+    if p_col not in history.columns or s_col not in history.columns:
+        return _empty()
+
     h = history[["time", p_col, s_col]].copy().rename(
         columns={p_col: "price", s_col: "signal"}
     )
-    h = h[h["price"] > 0].copy()
+    h = h[h["price"] > 0].copy().reset_index(drop=True)
+
+    # Always add all derived columns, defaulting to 0.0
+    for col in DERIVED_COLS:
+        h[col] = 0.0
+
     if len(h) < 2:
         return h
-    h["returns"]     = h["price"].pct_change()
-    p_range          = h["price"].max() - h["price"].min()
-    h["price_norm"]  = (h["price"] - h["price"].min()) / (p_range + 1e-9)
-    h["signal_norm"] = (h["signal"] + 1) / 2
-    h["rolling_corr"]= h["price_norm"].rolling(5).corr(h["signal_norm"]).fillna(0)
-    h["momentum"]    = h["signal_norm"].diff().fillna(0)
-    h["volatility"]  = h["signal"].rolling(3).std().fillna(0)
-    h["pred_score"]  = (
+
+    h["returns"]      = h["price"].pct_change()
+    p_range           = h["price"].max() - h["price"].min()
+    h["price_norm"]   = (h["price"] - h["price"].min()) / (p_range + 1e-9)
+    h["signal_norm"]  = (h["signal"] + 1) / 2
+    h["rolling_corr"] = h["price_norm"].rolling(5).corr(h["signal_norm"]).fillna(0)
+    h["momentum"]     = h["signal_norm"].diff().fillna(0)
+    h["volatility"]   = h["signal"].rolling(3).std().fillna(0)
+    h["pred_score"]   = (
         h["signal_norm"] * 0.5 +
         h["momentum"]    * 0.3 +
         ((h["rolling_corr"] + 1) / 2) * 0.2
     )
-    h["position"]      = h["pred_score"].apply(position_size)
-    h["strat_return"]  = h["position"].shift(1) * h["returns"]
-    h["strat_curve"]   = (1 + h["strat_return"].fillna(0)).cumprod()
-    h["hold_curve"]    = (1 + h["returns"].fillna(0)).cumprod()
+    h["position"]     = h["pred_score"].apply(position_size)
+    h["strat_return"] = h["position"].shift(1) * h["returns"]
+    h["strat_curve"]  = (1 + h["strat_return"].fillna(0)).cumprod()
+    h["hold_curve"]   = (1 + h["returns"].fillna(0)).cumprod()
     return h
 
 # ============================================================
@@ -426,7 +447,7 @@ with tab_overview:
     m1.metric("Price",        f"${coin_price:,.2f}" if coin_price < 1000 else f"${coin_price:,.0f}",
               delta=f"{coin_chg:+.2f}% 24h")
     m2.metric("Signal",       f"{coin_sig:+.3f}", delta=sig_label)
-    pred_now = float(coin_hist["pred_score"].iloc[-1]) if len(coin_hist) > 0 else 0.0
+    pred_now = float(coin_hist["pred_score"].iloc[-1]) if len(coin_hist) > 1 else 0.0
     pred_lbl, _ = get_signal_label(pred_now)
     m3.metric("Pred. Score",  f"{pred_now:+.3f}", delta=pred_lbl)
     mom_now  = float(coin_hist["momentum"].iloc[-1])  if len(coin_hist) > 1 else 0.0
@@ -773,7 +794,7 @@ with tab_strategy:
         unsafe_allow_html=True,
     )
 
-    pred_now = float(coin_hist["pred_score"].iloc[-1]) if len(coin_hist) > 0 else 0.0
+    pred_now = float(coin_hist["pred_score"].iloc[-1]) if len(coin_hist) > 1 else 0.0
     pred_lbl, pred_col = get_signal_label(pred_now)
     pos_now  = position_size(pred_now)
     pos_label = "LONG" if pos_now > 0 else ("SHORT" if pos_now < 0 else "FLAT")
