@@ -495,8 +495,7 @@ with tab_overview:
         ))
         fig.add_hline(y=0.5, line=dict(color="rgba(255,255,255,0.12)",
                                         width=1, dash="dot"))
-        fig.update_layout(**PLOTLY_LAYOUT, height=280,
-                          title=dict(text="", font=dict(size=0)))
+        fig.update_layout(**PLOTLY_LAYOUT, height=280)
         st.plotly_chart(fig, use_container_width=True)
 
         # ── BTC candlestick ──
@@ -738,10 +737,8 @@ with tab_strategy:
             hovertemplate="Position: %{y:.1f}<extra></extra>",
         ))
         fig_pos.add_hline(y=0, line=dict(color="rgba(255,255,255,0.15)", width=1))
-        fig_pos.update_layout(**PLOTLY_LAYOUT, height=200,
-                              yaxis=dict(**PLOTLY_LAYOUT["yaxis"],
-                                         range=[-1.3, 1.3],
-                                         tickvals=[-1, -0.5, 0, 0.5, 1]))
+        fig_pos.update_layout(**PLOTLY_LAYOUT, height=200)
+        fig_pos.update_yaxes(range=[-1.3, 1.3], tickvals=[-1, -0.5, 0, 0.5, 1])
         st.plotly_chart(fig_pos, use_container_width=True)
 
     # ── equity curves ──
