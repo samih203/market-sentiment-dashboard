@@ -570,9 +570,9 @@ with tab_overview:
                 bgcolor="#1a1e29",
                 borderwidth=0,
                 steps=[
-                    dict(range=[-1, -0.3], color="#ff4d6a22"),
-                    dict(range=[-0.3, 0.3],  color="#1a1e29"),
-                    dict(range=[0.3, 1],   color="#00d4a822"),
+                    dict(range=[-1, -0.3],  color="rgba(255,77,106,0.13)"),
+                    dict(range=[-0.3, 0.3], color="rgba(26,30,41,1)"),
+                    dict(range=[0.3, 1],    color="rgba(0,212,168,0.13)"),
                 ],
                 threshold=dict(line=dict(color="#6b7280", width=1),
                                thickness=0.6, value=0),
