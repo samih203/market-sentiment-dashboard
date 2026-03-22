@@ -143,7 +143,30 @@ prediction_corr = (
 )
 st.metric("Prediction Accuracy (corr)", round(prediction_corr, 3))
 
+# =====================
+# POSITION SIZING
+# =====================
 
+def position_size(score):
+    """
+    Converts predictive score into position size
+    Range: -1 (full short) → +1 (full long)
+    """
+    if score > 0.3:
+        return 1.0      # full long
+    elif score > 0.1:
+        return 0.5      # partial long
+    elif score < -0.3:
+        return -1.0     # full short
+    elif score < -0.1:
+        return -0.5     # partial short
+    else:
+        return 0.0      # no position
+
+history["position"] = history["predictive_score"].apply(position_size)
+
+st.subheader("📌 Positioning")
+st.line_chart(history.set_index("time")["position"])
 #===============
 #CHART
 #===============
@@ -206,8 +229,9 @@ else:
 
 
 
-history["strategy_return"] = history["predictive_score"].shift(1) * history["returns"]
-
+history["strategy_return"] = (
+    history["position"].shift(1) * history["returns"]
+)
 history["buy_hold"] = (1 + history["returns"].fillna(0)).cumprod()
 
 st.subheader("💰 Strategy vs BTC")
