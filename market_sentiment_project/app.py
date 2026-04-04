@@ -425,12 +425,13 @@ sig_label, sig_color = get_signal_label(coin_sig)
 # ============================================================
 # TABS
 # ============================================================
-tab_overview, tab_signals, tab_heatmap, tab_strategy, tab_settings = st.tabs([
+tab_overview, tab_signals, tab_heatmap, tab_strategy, tab_settings, tab_learn = st.tabs([
     f"📊  {coin} Overview",
     "📰  Signals",
     "🔥  Market Heatmap",
     "📈  Strategy",
     "⚙️  Settings",
+    "📚  Learn",
 ])
 
 # ─────────────────────────────────────────────
@@ -663,10 +664,8 @@ with tab_signals:
                         marker_color=color,
                         hovertemplate=f"{col}: %{{y}}<extra></extra>",
                     ))
-            fig_sent.update_layout(
-                **PLOTLY_BASE, barmode="stack", height=240,
-                legend=dict(orientation="h", y=1.1),
-            )
+            fig_sent.update_layout(**PLOTLY_BASE, barmode="stack", height=240)
+            fig_sent.update_layout(legend=dict(orientation="h", y=1.1))
             st.plotly_chart(fig_sent, use_container_width=True)
 
         # CSV export
@@ -779,8 +778,8 @@ with tab_heatmap:
         hovertemplate="%{x} signal: %{y:+.3f}<extra></extra>",
     ))
     fig_sig.add_hline(y=0, line=dict(color="rgba(255,255,255,0.15)", width=1))
-    fig_sig.update_layout(**PLOTLY_BASE, height=220,
-                          yaxis=dict(**PLOTLY_BASE["yaxis"], range=[-1, 1]))
+    fig_sig.update_layout(**PLOTLY_BASE, height=220)
+    fig_sig.update_yaxes(range=[-1, 1])
     st.plotly_chart(fig_sig, use_container_width=True)
 
 # ─────────────────────────────────────────────
@@ -895,6 +894,645 @@ with tab_settings:
     i2.metric("Coins tracked",    len(COINS))
     i3.metric("History points",   len(history))
     st.caption("Model: ProsusAI/FinBERT  ·  Pipeline TTL: 60s  ·  Price TTL: 20s")
+
+
+# ─────────────────────────────────────────────
+# TAB 6 — LEARN
+# ─────────────────────────────────────────────
+with tab_learn:
+
+    # ── CSS additions for learn tab cards ──
+    st.markdown("""
+    <style>
+    .learn-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.2rem 1.4rem;
+        margin-bottom: 0.75rem;
+    }
+    .learn-card-title {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .learn-card p, .learn-card li {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        line-height: 1.7;
+        font-family: 'DM Sans', sans-serif;
+        margin: 0.3rem 0;
+    }
+    .learn-card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .term-chip {
+        display: inline-block;
+        background: var(--bg3);
+        border: 1px solid var(--border2);
+        border-radius: 5px;
+        padding: 3px 10px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.68rem;
+        color: var(--green);
+        margin: 3px 3px 3px 0;
+    }
+    .level-badge {
+        font-size: 0.58rem;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-family: 'DM Sans', sans-serif;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+    }
+    .level-beginner { background: rgba(0,212,168,0.1); color: #00d4a8;
+                       border: 1px solid rgba(0,212,168,0.2); }
+    .level-intermediate { background: rgba(245,166,35,0.1); color: #f5a623;
+                           border: 1px solid rgba(245,166,35,0.2); }
+    .level-advanced { background: rgba(255,77,106,0.1); color: #ff4d6a;
+                       border: 1px solid rgba(255,77,106,0.2); }
+    .learn-divider {
+        border: none; border-top: 1px solid var(--border);
+        margin: 1.4rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── Section selector ──
+    section = st.radio(
+        "Section",
+        ["🌐  What is Crypto?", "📊  Reading This Dashboard",
+         "🧠  How the AI Works", "📈  Trading Concepts", "🔤  Glossary"],
+        horizontal=True, label_visibility="collapsed",
+    )
+
+    # ══════════════════════════════════════════
+    # SECTION 1 — WHAT IS CRYPTO
+    # ══════════════════════════════════════════
+    if section == "🌐  What is Crypto?":
+
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">
+                🌐 What is Cryptocurrency?
+                <span class="level-badge level-beginner">Beginner</span>
+            </div>
+            <p>Cryptocurrency is digital money secured by cryptography — mathematical codes that
+            make it nearly impossible to counterfeit. Unlike traditional currencies (dollars, euros),
+            no government or bank controls it. Transactions are recorded on a <strong style="color:#e2e4ed">blockchain</strong>:
+            a public ledger shared across thousands of computers worldwide.</p>
+            <p>Think of the blockchain as a Google Doc that everyone can read, nobody can delete,
+            and new lines can only be added — never edited.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">₿ Bitcoin (BTC)</div>
+                <p>The original cryptocurrency, created in 2009 by the pseudonymous
+                Satoshi Nakamoto. Bitcoin was designed as a peer-to-peer electronic
+                cash system — a way to send value anywhere in the world without a bank.</p>
+                <ul>
+                    <li>Fixed supply of 21 million coins ever</li>
+                    <li>New BTC minted via "mining" — solving complex math problems</li>
+                    <li>"Halving" events cut the mining reward in half every ~4 years,
+                    reducing new supply (historically bullish)</li>
+                    <li>Widely considered "digital gold" — a store of value</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">◎ Solana (SOL)</div>
+                <p>A high-speed blockchain focused on speed and low fees. Where Ethereum
+                can handle ~15 transactions per second, Solana targets 65,000+.</p>
+                <ul>
+                    <li>Popular for NFTs, gaming, and DeFi apps</li>
+                    <li>Uses "Proof of History" — a clock built into the blockchain</li>
+                    <li>Has suffered notable network outages in the past</li>
+                    <li>Strong developer community and ecosystem growth</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔴 Avalanche (AVAX)</div>
+                <p>A platform for building custom blockchains ("subnets") with near-instant
+                finality. Designed to be highly scalable without sacrificing decentralization.</p>
+                <ul>
+                    <li>Transaction finality in under 2 seconds</li>
+                    <li>Subnets let institutions build private or permissioned chains</li>
+                    <li>Competes directly with Ethereum for DeFi activity</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🐕 Dogecoin (DOGE)</div>
+                <p>Started as a joke in 2013 based on a popular meme, DOGE has become
+                a top-10 cryptocurrency by market cap — largely driven by social media
+                and celebrity attention (notably Elon Musk).</p>
+                <ul>
+                    <li>No supply cap — inflationary by design</li>
+                    <li>Extremely low transaction fees, fast confirmations</li>
+                    <li>Highly sentiment-driven — news and tweets move the price dramatically</li>
+                    <li>Used for tipping and microtransactions</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">⟠ Ethereum (ETH)</div>
+                <p>The world's programmable blockchain. While Bitcoin is mainly for
+                transferring value, Ethereum runs <strong style="color:#e2e4ed">smart contracts</strong>
+                — self-executing code that powers apps (dApps), DeFi protocols, NFTs, and more.</p>
+                <ul>
+                    <li>Powers most of the DeFi (decentralized finance) ecosystem</li>
+                    <li>Switched to "Proof of Stake" in 2022 (The Merge), cutting energy use ~99%</li>
+                    <li>ETH is used to pay "gas fees" — the cost of running computations</li>
+                    <li>EIP upgrades continuously improve performance and economics</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔶 BNB (Binance)</div>
+                <p>The native token of Binance — the world's largest crypto exchange —
+                and its own blockchain (BNB Chain). Originally a discount token for
+                trading fees, it now powers a large DeFi ecosystem.</p>
+                <ul>
+                    <li>Used for transaction fees on BNB Chain (cheap and fast)</li>
+                    <li>Binance periodically "burns" (destroys) BNB to reduce supply</li>
+                    <li>Heavily tied to Binance's business health and regulatory status</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">💧 XRP (Ripple)</div>
+                <p>XRP is designed for fast, cheap cross-border payments between banks
+                and financial institutions. Ripple Labs (the company behind XRP) has
+                had a long-running legal battle with the SEC over whether XRP is a security.</p>
+                <ul>
+                    <li>Transactions settle in 3–5 seconds for fractions of a cent</li>
+                    <li>Adopted by banks and payment processors worldwide</li>
+                    <li>The SEC lawsuit outcome is a major price driver — watch for news</li>
+                    <li>Pre-mined — no mining, controlled distribution by Ripple Labs</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔵 Cardano (ADA)</div>
+                <p>An academically-driven blockchain built with peer-reviewed research.
+                Founded by Ethereum co-founder Charles Hoskinson, Cardano emphasizes
+                formal verification and security above speed.</p>
+                <ul>
+                    <li>Research-first philosophy — slower to ship, but rigorously tested</li>
+                    <li>Energy efficient Proof of Stake since launch</li>
+                    <li>Growing smart contract and DeFi ecosystem (still maturing)</li>
+                    <li>Strong community focus on developing-world financial inclusion</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<hr class="learn-divider">', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">⚡ Key Crypto Concepts</div>
+            <p><strong style="color:#e2e4ed">Market Cap</strong> — Total value of all coins in circulation
+            (price × supply). Used to rank coins by size. BTC and ETH dominate.</p>
+            <p><strong style="color:#e2e4ed">Volatility</strong> — Crypto is far more volatile than stocks.
+            A 10% daily move is normal. 50%+ drawdowns happen in bear markets. Never invest more than you can afford to lose.</p>
+            <p><strong style="color:#e2e4ed">Bull / Bear Market</strong> — Bull = prices rising, optimism
+            high. Bear = prices falling, pessimism dominates. Crypto cycles are historically 3–4 years,
+            loosely tied to Bitcoin halving events.</p>
+            <p><strong style="color:#e2e4ed">Liquidity</strong> — How easily you can buy or sell without
+            moving the price. BTC and ETH are very liquid. Smaller coins can be illiquid — a big sell order
+            tanks the price.</p>
+            <p><strong style="color:#e2e4ed">Whale</strong> — An individual or entity holding a very large
+            amount of a coin. Whale transactions can move markets. On-chain analytics track wallet movements.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # SECTION 2 — READING THE DASHBOARD
+    # ══════════════════════════════════════════
+    elif section == "📊  Reading This Dashboard":
+
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">
+                📡 What SignalDesk Does
+                <span class="level-badge level-beginner">Beginner</span>
+            </div>
+            <p>SignalDesk reads crypto news in real time, runs each headline through an AI model,
+            and converts the sentiment into a numerical signal. The goal: surface whether the
+            current news flow is bullish (positive) or bearish (negative) for each coin —
+            faster than you could read the headlines yourself.</p>
+            <p>It does <em>not</em> predict prices. It measures the emotional tone of the market
+            narrative. Sentiment is one input into a trading decision, not a complete strategy.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🟢 Signal Score (−1 to +1)</div>
+                <p>The core output of the AI pipeline for each coin.</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">+0.5 to +1.0</strong> — Strong bullish news flow.
+                    Multiple positive headlines, high AI confidence.</li>
+                    <li><strong style="color:#f5a623">−0.15 to +0.15</strong> — Neutral. Mixed or
+                    macro/irrelevant news. No clear directional edge.</li>
+                    <li><strong style="color:#ff4d6a">−0.5 to −1.0</strong> — Strong bearish news flow.
+                    Negative headlines, crashes, hacks, bans.</li>
+                </ul>
+                <p>The signal combines the AI sentiment score, keyword boosts (e.g. "ETF approval"
+                adds +0.7), and article importance weighting.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔮 Predictive Score</div>
+                <p>A composite forward-looking number built from three inputs:</p>
+                <ul>
+                    <li><strong style="color:#e2e4ed">Signal (50%)</strong> — the current sentiment score</li>
+                    <li><strong style="color:#e2e4ed">Momentum (30%)</strong> — is the signal trending up or down?</li>
+                    <li><strong style="color:#e2e4ed">Correlation (20%)</strong> — how well has sentiment
+                    predicted price movement recently?</li>
+                </ul>
+                <p>Above +0.15 → BUY signal. Below −0.15 → SELL signal. In between → no edge.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📈 OHLC Candlestick Chart</div>
+                <p>Each candle represents a time period. The body shows open and close price;
+                the wicks show the high and low.</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">Green candle</strong> — price closed higher than it opened (bullish)</li>
+                    <li><strong style="color:#ff4d6a">Red candle</strong> — price closed lower than it opened (bearish)</li>
+                    <li>Long wicks = high volatility / indecision in that period</li>
+                    <li>Many small candles in a tight range = consolidation (a breakout may follow)</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">😨 Fear & Greed Index (0–100)</div>
+                <p>A single number summarising market sentiment for a given coin.</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">75–100 Extreme Greed</strong> — market may be
+                    overbought. Historically a caution signal.</li>
+                    <li><strong style="color:#4ade80">55–74 Greed</strong> — positive momentum, bullish bias</li>
+                    <li><strong style="color:#f5a623">45–54 Neutral</strong> — no clear edge</li>
+                    <li><strong style="color:#fb923c">25–44 Fear</strong> — negative sentiment, bearish bias</li>
+                    <li><strong style="color:#ff4d6a">0–24 Extreme Fear</strong> — historically a contrarian
+                    buy signal (market may be oversold)</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📉 Rolling Correlation Gauge</div>
+                <p>Measures how closely the sentiment signal has tracked the price over the last
+                5 data points.</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">Above +0.5</strong> — sentiment and price are
+                    moving together. The signal has predictive value right now.</li>
+                    <li><strong style="color:#6b7280">Near 0</strong> — no relationship. Sentiment is
+                    noisy relative to price.</li>
+                    <li><strong style="color:#ff4d6a">Below −0.5</strong> — sentiment and price are
+                    moving opposite. Could signal a reversal.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔥 Market Heatmap</div>
+                <p>The heatmap tab shows all 8 coins at once. Each tile's background intensity
+                encodes the strength of its sentiment signal:</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">Bright green</strong> — strong bullish signal</li>
+                    <li><strong style="color:#ff4d6a">Bright red</strong> — strong bearish signal</li>
+                    <li><strong style="color:#6b7280">Dark / neutral</strong> — no clear sentiment edge</li>
+                </ul>
+                <p>Use the heatmap to quickly spot which coins have the strongest news momentum
+                without switching tabs.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # SECTION 3 — HOW THE AI WORKS
+    # ══════════════════════════════════════════
+    elif section == "🧠  How the AI Works":
+
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">
+                🤖 The FinBERT Model
+                <span class="level-badge level-intermediate">Intermediate</span>
+            </div>
+            <p>SignalDesk uses <strong style="color:#e2e4ed">ProsusAI/FinBERT</strong> —
+            a BERT-based language model fine-tuned specifically on financial news text.
+            Unlike general-purpose sentiment models, FinBERT understands financial
+            vocabulary: words like "hawkish", "liquidity", "default", and "halving"
+            carry their correct financial meanings.</p>
+            <p>For each headline it outputs three probabilities summing to 1.0:
+            <strong style="color:#00d4a8">positive</strong>,
+            <strong style="color:#6b7280">neutral</strong>,
+            <strong style="color:#ff4d6a">negative</strong>.
+            The winning label becomes the sentiment direction; the winning
+            probability becomes the confidence score.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">⚙️ Signal Pipeline Step-by-Step</div>
+                <p><strong style="color:#e2e4ed">1. Fetch</strong> — RSS feeds from CoinDesk,
+                Cointelegraph, Reuters, The Block, and Decrypt are fetched every 60 seconds.
+                Up to 80 headlines are processed per run.</p>
+                <p><strong style="color:#e2e4ed">2. Tag</strong> — Each headline is scanned for
+                coin-specific keywords. "Ethereum gas fees spike" → tagged ETH.
+                Generic macro articles ("Fed raises rates") → tagged MACRO, applied to all
+                coins at 40% weight.</p>
+                <p><strong style="color:#e2e4ed">3. Score</strong> — FinBERT assigns sentiment
+                (−1 / 0 / +1) and confidence (0–1). The ML signal = sentiment × confidence.</p>
+                <p><strong style="color:#e2e4ed">4. Boost</strong> — Keyword overrides are applied.
+                Words like "crash", "hack", "ban" add −0.7. Words like "ETF", "approval",
+                "rally" add +0.7. These capture directional facts the model might miss.</p>
+                <p><strong style="color:#e2e4ed">5. Weight</strong> — Each article is multiplied by
+                its importance score (source credibility + keyword significance) and a time decay
+                factor (recent news counts more).</p>
+                <p><strong style="color:#e2e4ed">6. Aggregate</strong> — All weighted signals for
+                a coin are summed with exponential weighting → final signal score.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🏋️ Importance Score</div>
+                <p>Not all news is equal. Each article gets an importance multiplier before
+                its signal is counted:</p>
+                <ul>
+                    <li><strong style="color:#e2e4ed">Source weight</strong> — Reuters/Bloomberg
+                    carry 0.4 weight; smaller crypto blogs get 0.15. More credible sources
+                    move the signal more.</li>
+                    <li><strong style="color:#e2e4ed">Keyword weight</strong> — "crash" and "surge"
+                    add 2.0× (high impact events). "ETF" and "SEC" add 1.2× (regulatory news
+                    is historically price-moving). "Inflation" and "Fed" add 1.5× (macro drivers).</li>
+                    <li><strong style="color:#e2e4ed">Cap at 1.0</strong> — Importance is capped so
+                    no single article can dominate the signal entirely.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">⏱️ Time Decay</div>
+                <p>A 2-hour-old article matters less than a 10-minute-old one.
+                The decay formula is:</p>
+                <p style="font-family:'JetBrains Mono',monospace; font-size:0.75rem;
+                color:#00d4a8; background:#1a1e29; padding:8px 12px; border-radius:6px;
+                margin:8px 0">weight = max(0.1, 1 / (1 + hours_old / 6))</p>
+                <p>At 0 hours → weight = 1.0. At 6 hours → weight = 0.5.
+                At 24 hours → weight ≈ 0.2. The floor of 0.1 ensures even old news
+                has a tiny influence.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">⚠️ AI Limitations</div>
+                <p>FinBERT reads headlines, not full articles. It can be fooled by:</p>
+                <ul>
+                    <li>Sarcasm or irony in headlines</li>
+                    <li>Clickbait framing ("Bitcoin CRASHES to… a new all-time high")</li>
+                    <li>Context-dependent news (a "lawsuit" might be good or bad depending
+                    on who filed it)</li>
+                    <li>Rumours and unverified reports that move sentiment before the truth emerges</li>
+                </ul>
+                <p>Always read the underlying article before acting on any signal.
+                This tool is for research and education — not financial advice.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # SECTION 4 — TRADING CONCEPTS
+    # ══════════════════════════════════════════
+    elif section == "📈  Trading Concepts":
+
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">
+                ⚠️ Disclaimer
+                <span class="level-badge level-intermediate">Important</span>
+            </div>
+            <p>Nothing on this dashboard is financial advice. Crypto markets are highly volatile
+            and speculative. Past signal performance does not guarantee future results.
+            Always do your own research (DYOR) and consult a licensed financial advisor
+            before making investment decisions.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📐 Position Sizing</div>
+                <p>The strategy tab uses a simple rule to decide how much of a position to take
+                based on the predictive score:</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">Score > 0.3</strong> → Full long (100%)</li>
+                    <li><strong style="color:#4ade80">Score > 0.1</strong> → Half long (50%)</li>
+                    <li><strong style="color:#6b7280">−0.1 to 0.1</strong> → Flat (0% — no position)</li>
+                    <li><strong style="color:#fb923c">Score < −0.1</strong> → Half short (−50%)</li>
+                    <li><strong style="color:#ff4d6a">Score < −0.3</strong> → Full short (−100%)</li>
+                </ul>
+                <p>In real trading you would also factor in risk management rules,
+                stop-losses, and portfolio correlation.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📊 Equity Curve</div>
+                <p>The equity curve in the Strategy tab shows the hypothetical cumulative
+                return of following the signal strategy vs simply holding (buy & hold).</p>
+                <ul>
+                    <li>Starts at 1.0 (100% of starting capital)</li>
+                    <li>A value of 1.18 means the strategy has returned +18%</li>
+                    <li>Strategy curve beating the hold curve = signal added value</li>
+                    <li>Strategy curve lagging = the signal hurt performance</li>
+                </ul>
+                <p><strong style="color:#f5a623">Warning:</strong> With few data points (minutes of
+                history) this is highly noisy. Equity curves need hundreds of trades
+                to be statistically meaningful.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🔁 Long vs Short</div>
+                <p><strong style="color:#00d4a8">Long</strong> — you buy and profit when price goes up.
+                This is the standard "buy low, sell high" trade.</p>
+                <p><strong style="color:#ff4d6a">Short</strong> — you borrow an asset and sell it,
+                hoping to buy it back cheaper later and pocket the difference.
+                You profit when price goes down.</p>
+                <p>Shorting crypto is typically done via derivatives (futures/perpetuals)
+                on exchanges like Binance or Bybit. It amplifies both gains and losses.
+                Beginners should stick to long-only spot trading.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📉 Momentum</div>
+                <p>Momentum measures whether the signal is accelerating or decelerating —
+                the <em>rate of change</em> of sentiment, not its level.</p>
+                <ul>
+                    <li><strong style="color:#00d4a8">Positive momentum</strong> — sentiment is
+                    getting more bullish. A rising tide.</li>
+                    <li><strong style="color:#ff4d6a">Negative momentum</strong> — sentiment is
+                    deteriorating even if still positive overall.</li>
+                </ul>
+                <p>In markets, momentum tends to persist in the short term (trending)
+                but mean-revert over the medium term.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">📏 Volatility</div>
+                <p>The volatility metric here measures how much the signal itself is
+                jumping around — signal noise, not price volatility.</p>
+                <ul>
+                    <li><strong style="color:#f5a623">High signal volatility</strong> — conflicting
+                    headlines, uncertain market. Signals are less reliable.</li>
+                    <li><strong style="color:#00d4a8">Low signal volatility</strong> — consistent
+                    news flow in one direction. More trustworthy signal.</li>
+                </ul>
+                <p>The dashboard shows "NO CLEAR TREND" when signal volatility is below
+                0.02 — the noise floor where direction is indistinguishable from randomness.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("""
+            <div class="learn-card">
+                <div class="learn-card-title">🎯 Sentiment vs Price</div>
+                <p>Sentiment does not always lead price. Sometimes it lags. The relationship
+                changes depending on market conditions:</p>
+                <ul>
+                    <li><strong style="color:#e2e4ed">Bull market</strong> — good news pushes prices
+                    up quickly. Sentiment leads well.</li>
+                    <li><strong style="color:#e2e4ed">Bear market</strong> — bad news may already be
+                    priced in. Sentiment can lag or diverge.</li>
+                    <li><strong style="color:#e2e4ed">Ranging market</strong> — sentiment and price
+                    are uncorrelated. Watch the correlation gauge.</li>
+                </ul>
+                <p>The "Lead Indicator" metric on the Overview tab shows whether yesterday's
+                sentiment predicted today's price. When positive and above 0.4, the signal
+                has been genuinely predictive recently.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # SECTION 5 — GLOSSARY
+    # ══════════════════════════════════════════
+    elif section == "🔤  Glossary":
+
+        st.markdown("""
+        <div class="learn-card">
+            <div class="learn-card-title">
+                🔤 Full Glossary
+                <span class="level-badge level-beginner">Reference</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        terms = {
+            "All-Time High (ATH)": "The highest price a coin has ever reached. Breaking ATH is considered very bullish.",
+            "Altcoin": "Any cryptocurrency that is not Bitcoin. ETH, SOL, ADA, etc. are all altcoins.",
+            "Bearish": "Expecting prices to fall. Negative sentiment. Bear markets are prolonged downtrends.",
+            "Block": "A batch of verified transactions added to the blockchain. Each block links to the previous one, forming the chain.",
+            "Blockchain": "A distributed ledger of transactions shared across a network of computers. Immutable and transparent.",
+            "Bullish": "Expecting prices to rise. Positive sentiment. Bull markets are prolonged uptrends.",
+            "Burn": "Permanently destroying tokens by sending them to an unspendable address. Reduces supply, often bullish.",
+            "Confidence Score": "How certain the AI model is about its sentiment classification. 0.9+ = very confident; 0.5 = coin flip.",
+            "Correlation": "A measure of how two things move together. +1 = perfectly in sync; 0 = no relationship; −1 = opposite.",
+            "DeFi": "Decentralized Finance — financial services (lending, trading, earning yield) built on blockchains without banks.",
+            "DYOR": "Do Your Own Research. Always verify information before acting on it.",
+            "Equity Curve": "A chart showing the cumulative performance of a trading strategy over time.",
+            "ETF (Spot)": "Exchange-Traded Fund. A regulated product that lets traditional investors gain crypto exposure through a stock exchange. Bitcoin spot ETFs launched in the US in 2024, a major milestone.",
+            "Fear & Greed Index": "A 0–100 composite sentiment score. Extreme Fear can indicate oversold conditions; Extreme Greed can indicate overbought.",
+            "Fiat": "Government-issued currency (USD, EUR, GBP). Not backed by a commodity.",
+            "Gas Fee": "The cost to execute a transaction or smart contract on Ethereum. Paid in ETH.",
+            "Halving": "A programmed Bitcoin event (every ~210,000 blocks, ~4 years) that cuts the mining reward in half, reducing new BTC supply.",
+            "Importance Score": "SignalDesk's measure of how market-moving an article is likely to be, based on source credibility and keyword significance.",
+            "Liquidity": "How easily an asset can be bought or sold without significantly moving the price.",
+            "Long": "A trade that profits when price rises. Buying an asset with the expectation it will go up.",
+            "MACRO": "Articles with no coin-specific keywords. Applied to all coins at reduced weight as general market sentiment.",
+            "Market Cap": "Total market value = price × circulating supply. Used to rank cryptocurrencies by size.",
+            "Mining": "Using computing power to validate transactions and earn new Bitcoin as a reward.",
+            "Momentum": "The rate of change of the signal — whether sentiment is accelerating positively or negatively.",
+            "NFT": "Non-Fungible Token. A unique digital asset on a blockchain, commonly used for digital art and collectibles.",
+            "Position": "How much exposure you have to an asset. Long 100% = fully invested; Short 50% = half-sized short bet.",
+            "Predictive Score": "SignalDesk's composite forward-looking signal combining current sentiment (50%), momentum (30%), and correlation (20%).",
+            "Proof of Stake (PoS)": "A consensus mechanism where validators lock up (stake) coins as collateral to validate transactions. Energy-efficient.",
+            "Proof of Work (PoW)": "Bitcoin's consensus mechanism. Miners compete to solve math problems, consuming energy to validate transactions.",
+            "Rolling Correlation": "Correlation calculated over a recent window (last 5 points here), showing the current relationship between sentiment and price.",
+            "SEC": "U.S. Securities and Exchange Commission. Its regulatory actions (approvals, lawsuits) heavily impact crypto prices.",
+            "Sentiment": "The emotional tone of a piece of text — Positive, Negative, or Neutral — as classified by FinBERT.",
+            "Short": "A trade that profits when price falls. Borrowing and selling an asset expecting to buy it back cheaper.",
+            "Signal": "SignalDesk's composite score from −1 (maximum bearish) to +1 (maximum bullish) for each coin.",
+            "Smart Contract": "Self-executing code stored on a blockchain. Enables trustless agreements without intermediaries.",
+            "Time Decay": "The reduction in an article's influence as it gets older. Recent news matters more.",
+            "Volatility": "How much the signal jumps around. High volatility = conflicting/noisy news; low = consistent directional flow.",
+            "Whale": "An entity holding a very large amount of a cryptocurrency. Whale moves can significantly impact markets.",
+        }
+
+        # Render in two columns, alphabetical
+        sorted_terms = sorted(terms.items())
+        half = len(sorted_terms) // 2
+        gc1, gc2 = st.columns(2)
+
+        for col, chunk in [(gc1, sorted_terms[:half]), (gc2, sorted_terms[half:])]:
+            with col:
+                for term, definition in chunk:
+                    st.markdown(f"""
+                    <div style="border-left: 2px solid var(--border2); padding: 6px 0 6px 12px; margin-bottom: 10px;">
+                        <div style="font-family:'JetBrains Mono',monospace; font-size:0.72rem;
+                                    font-weight:700; color:var(--green); margin-bottom:3px;">{term}</div>
+                        <div style="font-size:0.75rem; color:#9ca3af; font-family:'DM Sans',sans-serif;
+                                    line-height:1.6">{definition}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # ============================================================
 # AUTO-REFRESH
