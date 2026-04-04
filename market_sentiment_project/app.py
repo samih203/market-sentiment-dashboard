@@ -218,7 +218,7 @@ load_model()
 # ============================================================
 # PIPELINE CACHE (60s TTL for NLP work)
 # ============================================================
-@st.cache_data(ttl=60, show_spinner="Analysing news…")
+@st.cache_data(ttl=60, show_spinner="Analyzing news…")
 def load_pipeline():
     return run_pipeline()
 
