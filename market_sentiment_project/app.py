@@ -13,6 +13,7 @@ from pipeline import (
     get_sentiment_pipeline,
     COINS,
 )
+# feed_status imported lazily inside load_pipeline result
 
 # ============================================================
 # PAGE CONFIG
@@ -218,14 +219,18 @@ load_model()
 # ============================================================
 # PIPELINE CACHE (60s TTL for NLP work)
 # ============================================================
-@st.cache_data(ttl=60, show_spinner="Analyzing news…")
+@st.cache_data(ttl=60, show_spinner="Analysing news…")
 def load_pipeline():
     return run_pipeline()
 
 try:
-    _df_cached, _prices_cached, market_signal, coin_momentum = load_pipeline()
+    _df_cached, _prices_cached, market_signal, coin_momentum, _feed_health, _is_stale = load_pipeline()
 except Exception as e:
-    st.error(f"Pipeline error: {e}")
+    st.error(
+        f"Pipeline failed to start: {e}\n\n"
+        "This usually means the NLP model is still loading or all RSS feeds are down. "
+        "The page will retry automatically."
+    )
     st.stop()
 
 df = _df_cached.copy(deep=True) if not _df_cached.empty else _df_cached
@@ -370,6 +375,25 @@ with hcol3:
         st.rerun()
 
 st.markdown("<hr>", unsafe_allow_html=True)
+
+# ── Staleness banner ──
+if _is_stale:
+    st.warning(
+        "⚠️ Live feeds are currently unreachable — showing last cached data. "
+        f"Retrying automatically every 60 seconds.",
+        icon="📡",
+    )
+
+# ── Feed health status (collapsed by default) ──
+_down_feeds = [name for name, s in _feed_health.items() if not s["ok"]]
+if _down_feeds:
+    with st.expander(f"⚠️ {len(_down_feeds)} feed(s) degraded — click to view", expanded=False):
+        for name, status in _feed_health.items():
+            icon = "🟢" if status["ok"] else "🔴"
+            last_ok = status.get("last_ok")
+            age = f" · last ok {int((time.time()-last_ok)//60)}m ago" if last_ok else ""
+            err = f" · {status['error']}" if status.get("error") else ""
+            st.caption(f"{icon} **{name}**{age}{err}")
 
 # ============================================================
 # PRICE TICKER — all 8 coins, click to select
