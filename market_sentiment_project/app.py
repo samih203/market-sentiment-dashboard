@@ -605,16 +605,22 @@ with tab_overview:
             ))
             _fig_ph.add_hline(y=0, line=dict(color="rgba(255,255,255,0.1)",
                                               width=1, dash="dot"))
-            _fig_ph.update_layout(
-                **PLOTLY_BASE, height=240,
-                yaxis=dict(title="Signal", gridcolor="rgba(255,255,255,0.04)",
-                           zeroline=False, tickfont=dict(size=10)),
-                yaxis2=dict(title="Price", overlaying="y", side="right",
-                            showgrid=False, zeroline=False,
-                            tickfont=dict(size=10, color=coin_color),
-                            tickformat="$,.0f"),
+            _fig_ph.update_layout(**PLOTLY_BASE, height=240)
+            _fig_ph.update_yaxes(
+                title="Signal",
+                gridcolor="rgba(255,255,255,0.04)",
+                zeroline=False,
+                tickfont=dict(size=10),
             )
-            _fig_ph.update_layout(legend=dict(orientation="h", y=1.08))
+            _fig_ph.update_layout(
+                yaxis2=dict(
+                    title="Price", overlaying="y", side="right",
+                    showgrid=False, zeroline=False,
+                    tickfont=dict(size=10, color=coin_color),
+                    tickformat="$,.0f",
+                ),
+                legend=dict(orientation="h", y=1.08),
+            )
             st.plotly_chart(_fig_ph, use_container_width=True)
         else:
             st.caption("Building history database — data will appear after a few minutes.")
