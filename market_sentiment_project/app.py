@@ -294,9 +294,8 @@ history = st.session_state.history.copy()
 if _changed:
     db_rows = []
     for ticker in COINS:
-        p     = prices.get(ticker, {})
-        sig   = coin_momentum.get(ticker, 0.0)
-        h_tmp = build_coin_history(ticker) if ticker in [coin] else None
+        p   = prices.get(ticker, {})
+        sig = coin_momentum.get(ticker, 0.0)
         db_rows.append({
             "ts":          time.time(),
             "coin":        ticker,
