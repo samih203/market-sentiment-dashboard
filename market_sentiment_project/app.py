@@ -13,7 +13,23 @@ from pipeline import (
     get_sentiment_pipeline,
     COINS,
 )
-# feed_status imported lazily inside load_pipeline result
+from persistence import (
+    init_db,
+    bulk_append_history,
+    load_history,
+    prune_history,
+    history_stats,
+    add_alert,
+    delete_alert,
+    toggle_alert,
+    list_alerts,
+    check_alerts,
+    recent_alert_log,
+    ALERT_TYPES,
+)
+
+# Initialise DB on every cold start (no-op if tables already exist)
+init_db()
 
 # ============================================================
 # PAGE CONFIG
@@ -273,7 +289,40 @@ if _changed:
 history = st.session_state.history.copy()
 
 # ============================================================
-# ALERT DETECTION
+# PERSIST HISTORY TO SQLITE  (only on rows we just appended)
+# ============================================================
+if _changed:
+    db_rows = []
+    for ticker in COINS:
+        p     = prices.get(ticker, {})
+        sig   = coin_momentum.get(ticker, 0.0)
+        h_tmp = build_coin_history(ticker) if ticker in [coin] else None
+        db_rows.append({
+            "ts":          time.time(),
+            "coin":        ticker,
+            "price":       float(p.get("price", 0)),
+            "change_24h":  float(p.get("change_24h", 0)),
+            "signal":      float(sig),
+            "pred_score":  0.0,
+            "momentum":    0.0,
+            "volatility":  0.0,
+            "fear_greed":  50.0,
+        })
+    try:
+        bulk_append_history(db_rows)
+    except Exception as _e:
+        print(f"DB write error: {_e}")
+
+# ── Prune old rows occasionally (1-in-20 chance per rerun) ──
+import random as _random
+if _random.random() < 0.05:
+    try:
+        prune_history(keep_days=30)
+    except Exception:
+        pass
+
+# ============================================================
+# ALERT DETECTION  (session alerts + persistent price alerts)
 # ============================================================
 ALERT_THRESHOLD = st.session_state.get("signal_thresh", 0.45)
 if not df.empty:
@@ -285,6 +334,18 @@ if not df.empty:
             st.session_state.alerts.append(msg)
             st.toast(msg, icon="⚡")
 st.session_state.alerts = st.session_state.alerts[-8:]
+
+# Check persistent price/signal alerts from SQLite
+try:
+    _fired_alerts = check_alerts(prices, coin_momentum, cooldown_minutes=30)
+    for fa in _fired_alerts:
+        icon = "🟢" if "above" in fa["type"] else "🔴"
+        msg  = f"{icon} ALERT: {fa['message']}"
+        st.toast(msg, icon="🔔")
+        if msg not in st.session_state.alerts:
+            st.session_state.alerts.append(msg)
+except Exception as _e:
+    print(f"Alert check error: {_e}")
 
 # ============================================================
 # HELPERS
@@ -517,26 +578,105 @@ with tab_overview:
         else:
             st.info("Accumulating history — check back in a few refreshes.")
 
+        # Persistent signal history from SQLite
+        st.markdown("### Signal History (Persistent)")
+        _hist_range = st.radio(
+            "History range", ["6 h", "24 h", "7 d", "30 d"],
+            horizontal=True, label_visibility="collapsed", key="hist_range",
+        )
+        _hours_map = {"6 h": 6, "24 h": 24, "7 d": 168, "30 d": 720}
+        try:
+            _db_hist = load_history(coin, hours=_hours_map[_hist_range])
+        except Exception:
+            _db_hist = pd.DataFrame()
+
+        if not _db_hist.empty:
+            _fig_ph = go.Figure()
+            _fig_ph.add_trace(go.Scatter(
+                x=_db_hist["time"], y=_db_hist["price"],
+                name="Price", line=dict(color=coin_color, width=1.5),
+                yaxis="y2",
+                hovertemplate="$%{y:,.2f}<extra>Price</extra>",
+            ))
+            _fig_ph.add_trace(go.Scatter(
+                x=_db_hist["time"], y=_db_hist["signal"],
+                name="Signal", line=dict(color=GREEN, width=2),
+                fill="tozeroy", fillcolor="rgba(0,212,168,0.06)",
+                hovertemplate="%{y:+.3f}<extra>Signal</extra>",
+            ))
+            _fig_ph.add_hline(y=0, line=dict(color="rgba(255,255,255,0.1)",
+                                              width=1, dash="dot"))
+            _fig_ph.update_layout(
+                **PLOTLY_BASE, height=240,
+                yaxis=dict(title="Signal", gridcolor="rgba(255,255,255,0.04)",
+                           zeroline=False, tickfont=dict(size=10)),
+                yaxis2=dict(title="Price", overlaying="y", side="right",
+                            showgrid=False, zeroline=False,
+                            tickfont=dict(size=10, color=coin_color),
+                            tickformat="$,.0f"),
+            )
+            _fig_ph.update_layout(legend=dict(orientation="h", y=1.08))
+            st.plotly_chart(_fig_ph, use_container_width=True)
+        else:
+            st.caption("Building history database — data will appear after a few minutes.")
+
         # OHLC candlestick
         st.markdown("### OHLC Chart")
-        ohlc_days = st.radio("OHLC Period", ["1 day", "7 days", "30 days"],
-                             horizontal=True, label_visibility="collapsed",
-                             key="ohlc_period")
+        _oc1, _oc2 = st.columns([3, 2])
+        with _oc1:
+            ohlc_days = st.radio("Period", ["1 day", "7 days", "30 days"],
+                                 horizontal=True, label_visibility="collapsed",
+                                 key="ohlc_period")
+        with _oc2:
+            show_ma = st.checkbox("Show MAs (7 / 25)", value=True, key="show_ma")
+
         days_map = {"1 day": 1, "7 days": 7, "30 days": 30}
         ohlc = fetch_ohlc(coin, days=days_map[ohlc_days])
         if not ohlc.empty:
-            fig2 = go.Figure(go.Candlestick(
+            # Compute moving averages
+            ohlc["ma7"]  = ohlc["close"].rolling(7,  min_periods=1).mean()
+            ohlc["ma25"] = ohlc["close"].rolling(25, min_periods=1).mean()
+
+            # Price range annotation
+            hi  = ohlc["high"].max()
+            lo  = ohlc["low"].min()
+            rng = ((hi - lo) / lo * 100) if lo > 0 else 0
+
+            fig2 = go.Figure()
+            fig2.add_trace(go.Candlestick(
                 x=ohlc["time"],
                 open=ohlc["open"], high=ohlc["high"],
                 low=ohlc["low"],  close=ohlc["close"],
                 increasing_line_color=GREEN, decreasing_line_color=RED,
                 name=f"{coin}/USD",
             ))
-            fig2.update_layout(**PLOTLY_BASE, height=240,
+            if show_ma:
+                fig2.add_trace(go.Scatter(
+                    x=ohlc["time"], y=ohlc["ma7"],
+                    name="MA7", line=dict(color=AMBER, width=1.2, dash="dot"),
+                    hovertemplate="MA7: $%{y:,.2f}<extra></extra>",
+                ))
+                fig2.add_trace(go.Scatter(
+                    x=ohlc["time"], y=ohlc["ma25"],
+                    name="MA25", line=dict(color=BLUE, width=1.2, dash="dash"),
+                    hovertemplate="MA25: $%{y:,.2f}<extra></extra>",
+                ))
+            fig2.update_layout(**PLOTLY_BASE, height=300,
                                xaxis_rangeslider_visible=False)
+            fig2.update_layout(legend=dict(orientation="h", y=1.08))
             st.plotly_chart(fig2, use_container_width=True)
+
+            # Period summary strip
+            _s1, _s2, _s3, _s4 = st.columns(4)
+            _open  = float(ohlc["open"].iloc[0])
+            _close = float(ohlc["close"].iloc[-1])
+            _chg   = ((_close - _open) / _open * 100) if _open > 0 else 0
+            _s1.metric(f"{ohlc_days} High",   f"${hi:,.2f}")
+            _s2.metric(f"{ohlc_days} Low",    f"${lo:,.2f}")
+            _s3.metric(f"{ohlc_days} Range",  f"{rng:.1f}%")
+            _s4.metric(f"{ohlc_days} Change", f"{_chg:+.2f}%")
         else:
-            st.info("OHLC unavailable — API rate limit may apply.")
+            st.info("OHLC unavailable — API rate limit may apply. Try again in 30s.")
 
     with right:
         st.markdown("### Composite Score")
@@ -894,30 +1034,125 @@ with tab_strategy:
 # TAB 5 — SETTINGS
 # ─────────────────────────────────────────────
 with tab_settings:
-    st.markdown("### Alert Thresholds")
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        signal_thresh = st.slider("Signal alert threshold", 0.1, 1.0,
-                                   st.session_state.get("signal_thresh", 0.45), 0.05)
-        st.session_state["signal_thresh"] = signal_thresh
-    with col_s2:
-        fg_alert = st.slider("Fear & Greed extreme alert", 0, 50,
-                              st.session_state.get("fg_alert", 20), 5)
-        st.session_state["fg_alert"] = fg_alert
 
-    st.markdown("### Recent Alerts")
-    if st.session_state.alerts:
-        for a in reversed(st.session_state.alerts):
-            st.markdown(f'<div class="alert-banner">{a}</div>', unsafe_allow_html=True)
-    else:
-        st.caption("No alerts this session.")
+    set_tab1, set_tab2, set_tab3 = st.tabs(["🔔  Price Alerts", "⚙️  Thresholds", "🗄️  Database"])
 
-    st.markdown("### Pipeline Info")
-    i1, i2, i3 = st.columns(3)
-    i1.metric("Articles loaded",  len(df) if not df.empty else 0)
-    i2.metric("Coins tracked",    len(COINS))
-    i3.metric("History points",   len(history))
-    st.caption("Model: ProsusAI/FinBERT  ·  Pipeline TTL: 60s  ·  Price TTL: 20s")
+    # ── Price Alerts ──
+    with set_tab1:
+        st.markdown("### Create Alert")
+        _ac1, _ac2, _ac3, _ac4 = st.columns([2, 3, 2, 2])
+        with _ac1:
+            _a_coin  = st.selectbox("Coin",  list(COINS.keys()), key="a_coin")
+        with _ac2:
+            _a_type  = st.selectbox("Condition", list(ALERT_TYPES.keys()),
+                                    format_func=lambda x: ALERT_TYPES[x], key="a_type")
+        with _ac3:
+            _is_price = "price" in _a_type
+            _cur_val  = prices.get(_a_coin, {}).get("price", 100) if _is_price                         else coin_momentum.get(_a_coin, 0.0)
+            _step     = max(float(int(_cur_val * 0.01)), 1.0) if _is_price else 0.05
+            _a_thresh = st.number_input(
+                "Threshold", value=float(round(_cur_val, 2 if not _is_price else 0)),
+                step=_step, format="%.2f", key="a_thresh",
+            )
+        with _ac4:
+            _a_label = st.text_input("Label (optional)", key="a_label",
+                                      placeholder="e.g. BTC breakout")
+
+        if st.button("＋ Add Alert", key="add_alert_btn", use_container_width=True):
+            try:
+                aid = add_alert(_a_coin, _a_type, float(_a_thresh), _a_label)
+                st.success(f"Alert #{aid} created for {_a_coin}.")
+                st.rerun()
+            except Exception as _e:
+                st.error(f"Failed to create alert: {_e}")
+
+        st.markdown("### Active Alerts")
+        _alerts_df = list_alerts()
+        if _alerts_df.empty:
+            st.caption("No alerts configured. Create one above.")
+        else:
+            for _, _ar in _alerts_df.iterrows():
+                _aid    = int(_ar["id"])
+                _active = bool(_ar["active"])
+                _rc1, _rc2, _rc3, _rc4, _rc5 = st.columns([1, 2, 3, 2, 1])
+                _rc1.markdown(
+                    f'<span style="color:{"#00d4a8" if _active else "#6b7280"};'
+                    f'font-family:JetBrains Mono;font-size:0.8rem">'
+                    f'{"●" if _active else "○"}</span>',
+                    unsafe_allow_html=True,
+                )
+                _rc2.caption(_ar["coin"])
+                _rc3.caption(ALERT_TYPES.get(_ar["alert_type"], _ar["alert_type"]))
+                _fmt = f'${_ar["threshold"]:,.2f}' if "price" in _ar["alert_type"]                        else f'{_ar["threshold"]:+.3f}'
+                _rc4.caption(_fmt)
+                with _rc5:
+                    if st.button("✕", key=f"del_alert_{_aid}", help="Delete"):
+                        delete_alert(_aid)
+                        st.rerun()
+
+        st.markdown("### Alert History")
+        _log = recent_alert_log(20)
+        if not _log.empty:
+            st.dataframe(_log[["time","coin","alert_type","threshold","message"]],
+                         hide_index=True, use_container_width=True)
+        else:
+            st.caption("No alerts have fired yet.")
+
+    # ── Thresholds ──
+    with set_tab2:
+        st.markdown("### Session Signal Alerts")
+        st.caption("These fire toast notifications based on the live sentiment score "
+                   "(session only — use the Price Alerts tab for persistent alerts).")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            signal_thresh = st.slider("Signal alert threshold", 0.1, 1.0,
+                                       st.session_state.get("signal_thresh", 0.45), 0.05)
+            st.session_state["signal_thresh"] = signal_thresh
+        with col_s2:
+            fg_alert = st.slider("Fear & Greed extreme alert", 0, 50,
+                                  st.session_state.get("fg_alert", 20), 5)
+            st.session_state["fg_alert"] = fg_alert
+
+        st.markdown("### Recent Session Alerts")
+        if st.session_state.alerts:
+            for _a in reversed(st.session_state.alerts):
+                st.markdown(f'<div class="alert-banner">{_a}</div>',
+                            unsafe_allow_html=True)
+        else:
+            st.caption("No alerts this session.")
+
+    # ── Database ──
+    with set_tab3:
+        st.markdown("### Signal History Database")
+        try:
+            _stats = history_stats()
+            _ds1, _ds2, _ds3 = st.columns(3)
+            _ds1.metric("Total rows",    f'{_stats["total_rows"]:,}')
+            _ds2.metric("Oldest record", _stats["oldest_str"])
+            _ds3.metric("Coins tracked", len(COINS))
+        except Exception:
+            st.caption("Database not yet initialised.")
+
+        st.markdown("### Pipeline Info")
+        i1, i2, i3 = st.columns(3)
+        i1.metric("Articles loaded", len(df) if not df.empty else 0)
+        i2.metric("History points",  len(history))
+        i3.metric("Stale data",      "Yes" if _is_stale else "No")
+        st.caption("Model: ProsusAI/FinBERT  ·  Pipeline TTL: 60s  ·  Price TTL: 20s  ·  DB: SQLite")
+
+        st.markdown("### Export Full History")
+        try:
+            _full_hist = load_history(coin, hours=720)
+            if not _full_hist.empty:
+                _exp_csv = _full_hist.to_csv(index=False)
+                st.download_button(
+                    f"⬇  Export {coin} 30-day history CSV",
+                    data=_exp_csv,
+                    file_name=f"{coin}_30d_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                )
+        except Exception:
+            st.caption("No history to export yet.")
 
 
 # ─────────────────────────────────────────────
